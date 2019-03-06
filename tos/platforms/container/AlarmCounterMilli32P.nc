@@ -24,7 +24,11 @@ implementation {
 
 	command error_t Init.init() {
 		uint8_t i;
-		debug1("alarms %d", ALARM_COUNT);
+		
+		#ifdef ACM_DEBUG
+			debug1("alarms %d", ALARM_COUNT);
+		#endif
+
 		for(i=0;i<ALARM_COUNT;i++) {
 			atomic {
 				timers[i] = osTimerNew(&timer_callback, osTimerOnce, &timers[i], NULL);
@@ -43,7 +47,11 @@ implementation {
 
 	async command void Alarm.start[uint8_t tmr](uint32_t dt) {
 		uint32_t ta = call Counter.get() + dt;
-		debug1("start[%d] %"PRIu32"+%"PRIu32, tmr, ta - dt, dt);
+
+		#ifdef ACM_DEBUG
+			debug1("start[%d] 0x%x %"PRIu32"+%"PRIu32, tmr, timers[tmr], ta - dt, dt);
+		#endif
+
 		atomic {
 			alarm[tmr] = ta;
 			osTimerStart(timers[tmr], dt);
@@ -51,7 +59,14 @@ implementation {
 	}
 
 	async command void Alarm.stop[uint8_t tmr]() {
-		osTimerStop(timers[tmr]);
+		if (osTimerIsRunning(timers[tmr])) {
+			
+			#ifdef ACM_DEBUG
+				debug1("stp[%d] 0x%x", tmr, timers[tmr]);
+			#endif
+
+			osTimerStop(timers[tmr]);
+		}
 	}
 
 	async command bool Alarm.isRunning[uint8_t tmr]() {
@@ -60,7 +75,11 @@ implementation {
 
 	async command void Alarm.startAt[uint8_t tmr](uint32_t t0, uint32_t dt) {
 		uint32_t ta = t0 + dt;
-		debug1("startAt[%d] %"PRIu32"+%"PRIu32, tmr, t0, dt);
+
+		#ifdef ACM_DEBUG
+			debug1("startAt[%d] 0x%x %"PRIu32"+%"PRIu32, tmr, timers[tmr], t0, dt);
+		#endif
+
 		atomic {
 			alarm[tmr] = ta;
 			osTimerStart(timers[tmr], ta - call Counter.get());

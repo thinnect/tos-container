@@ -1,0 +1,22 @@
+#-*-Makefile-*- vim:syntax=make
+define NULL_HELP
+
+ NULL extras:
+
+   debug    : compile with minimal optimization and debug symbols
+
+endef
+HELP += $(NULL_HELP)
+
+GCC     = arm-none-eabi-gcc
+OBJCOPY = /bin/true
+OBJDUMP = /bin/true
+SIZE    = /bin/true
+NM      = /bin/true
+#LIBS    = -lm
+
+INSTALL_SREC = $(MAIN_SREC).out$(if $(NODEID),-$(NODEID),)
+
+TOSMAKE_FLASH_CHIP ?= at45db
+
+PFLAGS += -Wall -Wshadow

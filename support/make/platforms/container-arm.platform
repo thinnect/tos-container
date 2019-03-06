@@ -1,0 +1,33 @@
+PFLAGS += -I%T/platforms/container
+PFLAGS += -I%T/lib/timer
+PFLAGS += -I%T/lib/serial
+PFLAGS += -I%T/lib/power
+#PFLAGS += -I%T/lib/rfxlink/layers
+PFLAGS += -I%T/lib/rfxlink/util
+
+PFLAGS += -fnesc-no-debug
+
+PFLAGS += -fnesc-target=env
+export NESC_MACHINE = structure_size_boundary=32, pointer=4,4 float=4,4 double=8,4 long_double=8,4 short=2,2 int=4,4 long=4,4 long_long=8,4 int1248_align=1,2,4,4 wchar_size_size=4,4 char_wchar_signed=false,true
+
+PFLAGS += -conly
+
+# conly still tries to do linking for some reason, fsyntax-only helps
+PFLAGS += -fsyntax-only
+
+#PFLAGS += -fnesc-verbose
+#PFLAGS += -fnesc-cfile=container.c
+#PFLAGS += -fnesc-gccize
+
+ifdef RADIO_CHANNEL
+    $(info RADIO_CHANNEL=$(RADIO_CHANNEL))
+    PFLAGS += -DDEFAULT_RADIO_CHANNEL=$(RADIO_CHANNEL)
+    PFLAGS += -DRFA1_DEF_CHANNEL=$(RADIO_CHANNEL)
+endif
+
+ifdef RFPOWER
+    $(info RFPOWER=$(RFPOWER))
+    PFLAGS += -DDEFAULT_RFPOWER=$(RFPOWER)
+    PFLAGS += -DRFA1_DEF_RFPOWER=$(RFPOWER)
+endif
+

@@ -62,7 +62,7 @@ implementation
     uint32_t dt;
     bool isoneshot : 1;
     bool isrunning : 1;
-    bool _reserved : 6;
+    uint8_t _reserved : 6;
   } Timer_t;
 
   Timer_t m_timers[NUM_TIMERS];

@@ -1,0 +1,11 @@
+TOSMAKE_POST_EXE_DEPS += container_cleanup
+
+build_tosimage: build_dir
+	@echo -e 'build_tosimage'
+
+build_buildinfo: build_dir
+	@echo -e 'build_buildinfo'
+
+container_cleanup: exe
+	@echo -e 'Running cleanup...'
+	sed -i '/typedef uint8_t _Bool;/d' $(NESC_CFILE)

@@ -41,7 +41,7 @@ module ActiveMessageP {
 implementation {
 
 	#define __MODUUL__ "am"
-	#define __LOG_LEVEL__ (LOG_LEVEL_ActiveMessageC & BASE_LOG_LEVEL)
+	#define __LOG_LEVEL__ (LOG_LEVEL_ActiveMessageP & BASE_LOG_LEVEL)
 	#include "log.h"
 
 	enum ActiveMessageStates {

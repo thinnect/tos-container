@@ -35,7 +35,11 @@ configuration ActiveMessageC {
 }
 implementation {
 
-	components ActiveMessageP;
+	#ifdef ACTIVEMESSAGE_DUMMY
+		components ActiveMessageDummyP as ActiveMessageP;
+	#else
+		components ActiveMessageP;
+	#endif//ACTIVEMESSAGE_DUMMY
 	SplitControl = ActiveMessageP.SplitControl;
 
 	AMSend = ActiveMessageP.AMSend;

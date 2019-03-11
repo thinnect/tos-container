@@ -274,7 +274,7 @@ implementation {
 
 	// AMPacket interface
 	command am_addr_t AMPacket.address() {
-		return TOS_NODE_ID;
+		return comms_am_address(m_radio);
 	}
 
 	command am_addr_t AMPacket.destination(message_t* amsg) {

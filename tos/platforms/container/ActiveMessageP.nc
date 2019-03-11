@@ -154,18 +154,35 @@ implementation {
 
 	task void stopDone() {
 		signal SplitControl.stopDone(SUCCESS);
+		m_state = ST_OFF;
 	}
 
 	// SplitControl interface
 	command error_t SplitControl.start() {
+		if(m_radio == NULL) {
+			return ENOMEM;
+		}
+		if(m_state == ST_RUNNING) {
+			return EALREADY;
+		}
 		if(m_state == ST_OFF) {
 			m_state = ST_STARTING;
 			post startDone();
+			return SUCCESS;
 		}
+		return EBUSY;
 	}
 
 	command error_t SplitControl.stop() {
-		return post stopDone();
+		if(m_state == ST_OFF) {
+			return EALREADY;
+		}
+		if(m_state == ST_RUNNING) {
+			m_state = ST_STOPPING;
+			post stopDone();
+			return SUCCESS;
+		}
+		return EBUSY;
 	}
 	// -------------------------------------------------------------------------
 

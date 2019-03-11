@@ -1,9 +1,0 @@
-#-*-Makefile-*- vim:syntax=make
-
-TARGET = container-pc
-
-$(call TOSMake_include_platform,container-pc)
-$(call TOSMake_include_make_platform,container-pc)
-
-container-pc: $(BUILD_DEPS)
-        @:

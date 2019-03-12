@@ -153,6 +153,10 @@ implementation {
 	}
 
 	task void stopDone() {
+		uint8_t i;
+		for(i=0;i<sizeof(rcvids);i++) {
+			comms_deregister_recv(m_radio, &m_receivers[i]);
+		}
 		signal SplitControl.stopDone(SUCCESS);
 		m_state = ST_OFF;
 	}

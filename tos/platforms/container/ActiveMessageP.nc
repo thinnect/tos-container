@@ -237,7 +237,7 @@ implementation {
 	}
 
 	command uint8_t AMSend.maxPayloadLength[uint8_t id]() {
-		return TOSH_DATA_LENGTH;
+		return comms_get_payload_max_length(m_radio);
 	}
 
 	command void* AMSend.getPayload[uint8_t id](message_t* msg, uint8_t len) {
@@ -254,7 +254,7 @@ implementation {
 	}
 
 	command uint8_t Packet.maxPayloadLength() {
-		return TOSH_DATA_LENGTH;
+		return comms_get_payload_max_length(m_radio);
 	}
 
 	command void* Packet.getPayload(message_t* msg, uint8_t len) {

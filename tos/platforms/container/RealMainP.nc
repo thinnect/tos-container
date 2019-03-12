@@ -11,8 +11,10 @@ implementation {
 
 	#warning "Container RealMainP"
 
-	void container_boot() @C() @spontaneous() {
+	void container_boot(uint16_t tos_node_id) @C() @spontaneous() {
 		atomic {
+			TOS_NODE_ID = tos_node_id;
+
 			platform_bootstrap();
 
 			call Scheduler.init();

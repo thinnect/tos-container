@@ -72,4 +72,7 @@ implementation {
 	TimeSyncAMSendMilli = ActiveMessageP.TimeSyncAMSendMilli;
 	TimeSyncPacketMilli = ActiveMessageP.TimeSyncPacketMilli;
 
+	components LocalTimeMilliC;
+	ActiveMessageP.LocalTimeMilli -> LocalTimeMilliC;
+
 }

@@ -251,6 +251,7 @@ implementation {
 
 	// Packet interface
 	command void Packet.clear(message_t* msg) {
+		memset(msg, 0, sizeof(message_t));
 	}
 
 	command uint8_t Packet.payloadLength(message_t* msg) {

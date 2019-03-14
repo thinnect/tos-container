@@ -74,7 +74,11 @@ implementation {
 		comms_am_set_source(m_radio, cmsg, call AMPacket.address());
 
 		if(((radio_metadata_t*)(msg->metadata))->timestamp_valid) {
-			comms_set_event_time(m_radio, cmsg, ((radio_metadata_t*)(msg->metadata))->timestamp);
+			comms_set_timestamp(m_radio, cmsg, ((radio_metadata_t*)(msg->metadata))->timestamp);
+		}
+
+		if(((radio_metadata_t*)(msg->metadata))->event_time_valid) {
+			comms_set_event_time(m_radio, cmsg, ((radio_metadata_t*)(msg->metadata))->event_time);
 		}
 
 		comms_set_ack_required(m_radio, cmsg, ((radio_metadata_t*)(msg->metadata))->ack_requested);
@@ -99,8 +103,11 @@ implementation {
 		call AMPacket.setDestination(msg, comms_am_get_destination(m_radio, cmsg));
 		call AMPacket.setSource(msg, comms_am_get_source(m_radio, cmsg));
 
-		((radio_metadata_t*)(msg->metadata))->timestamp = comms_get_event_time(m_radio, cmsg);
-		((radio_metadata_t*)(msg->metadata))->timestamp_valid = comms_event_time_valid(m_radio, cmsg);
+		((radio_metadata_t*)(msg->metadata))->timestamp = comms_get_timestamp(m_radio, cmsg);
+		((radio_metadata_t*)(msg->metadata))->timestamp_valid = comms_timestamp_valid(m_radio, cmsg);
+
+		((radio_metadata_t*)(msg->metadata))->event_time = comms_get_event_time(m_radio, cmsg);
+		((radio_metadata_t*)(msg->metadata))->event_time_valid = comms_event_time_valid(m_radio, cmsg);
 
 		((radio_metadata_t*)(msg->metadata))->ack_received = comms_ack_received(m_radio, cmsg);
 
@@ -496,8 +503,8 @@ implementation {
 			call Packet.setPayloadLength(msg, len);
 			call AMPacket.setType(msg, id);
 			call AMPacket.setDestination(msg, addr);
-			((radio_metadata_t*)(msg->metadata))->timestamp = event_time;
-			((radio_metadata_t*)(msg->metadata))->timestamp_valid = TRUE;
+			((radio_metadata_t*)(msg->metadata))->event_time = event_time;
+			((radio_metadata_t*)(msg->metadata))->event_time_valid = TRUE;
 
 			if(tosToComms(&s_tr_commsmsg, msg) == SUCCESS) {
 				comms_error_t err = comms_send(m_radio, &s_tr_commsmsg, &commsTimestampRadioSendDone, msg);
@@ -560,8 +567,8 @@ implementation {
 			call Packet.setPayloadLength(msg, len);
 			call AMPacket.setType(msg, id);
 			call AMPacket.setDestination(msg, addr);
-			((radio_metadata_t*)(msg->metadata))->timestamp = event_time;
-			((radio_metadata_t*)(msg->metadata))->timestamp_valid = TRUE;
+			((radio_metadata_t*)(msg->metadata))->event_time = event_time;
+			((radio_metadata_t*)(msg->metadata))->event_time_valid = TRUE;
 
 			if(tosToComms(&s_tm_commsmsg, msg) == SUCCESS) {
 				comms_error_t err = comms_send(m_radio, &s_tm_commsmsg, &commsTimestampMilliSendDone, msg);
@@ -595,21 +602,21 @@ implementation {
 
 	// TimeSyncPacketRadio interface
 	command bool TimeSyncPacketRadio.isValid(message_t* msg) {
-		return ((radio_metadata_t*)(msg->metadata))->timestamp_valid;
+		return ((radio_metadata_t*)(msg->metadata))->event_time_valid;
 	}
 
 	command uint32_t TimeSyncPacketRadio.eventTime(message_t* msg) {
-		return ((radio_metadata_t*)(msg->metadata))->timestamp;
+		return ((radio_metadata_t*)(msg->metadata))->event_time;
 	}
 	// -------------------------------------------------------------------------
 
 	// TimeSyncPacketMilli interface
 	command bool TimeSyncPacketMilli.isValid(message_t* msg) {
-		return ((radio_metadata_t*)(msg->metadata))->timestamp_valid;
+		return ((radio_metadata_t*)(msg->metadata))->event_time_valid;
 	}
 
 	command uint32_t TimeSyncPacketMilli.eventTime(message_t* msg) {
-		return ((radio_metadata_t*)(msg->metadata))->timestamp;
+		return ((radio_metadata_t*)(msg->metadata))->event_time;
 	}
 	// -------------------------------------------------------------------------
 

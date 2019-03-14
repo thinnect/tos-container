@@ -16,6 +16,9 @@ typedef struct radio_metadata {
 	uint32_t timestamp;
 	bool timestamp_valid;
 
+	uint32_t event_time;
+	bool event_time_valid;
+
 	uint8_t lqi;
 	bool lqi_set;
 

@@ -133,16 +133,18 @@ implementation {
 	default event message_t* Receive.receive[uint8_t id](message_t* msg, void* payload, uint8_t length) { return msg; }
 
 	task void receivedMessage() {
-		uint8_t length = call Packet.payloadLength(r_tosmsg);
+		if(m_state == ST_RUNNING) {
+			uint8_t length = call Packet.payloadLength(r_tosmsg);
 
-		if(call TimeSyncPacketMilli.isValid(r_tosmsg)) {
-			debug1("rcv %02X %04X age=%"PRIi32, call AMPacket.type(r_tosmsg), call AMPacket.source(r_tosmsg), call LocalTimeMilli.get() - call TimeSyncPacketMilli.eventTime(r_tosmsg));
-		}
-		else {
-			debug1("rcv %02X %04X", call AMPacket.type(r_tosmsg), call AMPacket.source(r_tosmsg));
-		}
+			if(call TimeSyncPacketMilli.isValid(r_tosmsg)) {
+				debug1("rcv %02X %04X age=%"PRIi32, call AMPacket.type(r_tosmsg), call AMPacket.source(r_tosmsg), call LocalTimeMilli.get() - call TimeSyncPacketMilli.eventTime(r_tosmsg));
+			}
+			else {
+				debug1("rcv %02X %04X", call AMPacket.type(r_tosmsg), call AMPacket.source(r_tosmsg));
+			}
 
-		r_tosmsg = signal Receive.receive[call AMPacket.type(r_tosmsg)](r_tosmsg, call Packet.getPayload(r_tosmsg, length), length);
+			r_tosmsg = signal Receive.receive[call AMPacket.type(r_tosmsg)](r_tosmsg, call Packet.getPayload(r_tosmsg, length), length);
+		}
 		r_busy = FALSE;
 	}
 
@@ -177,8 +179,8 @@ implementation {
 		//for(i=0;i<sizeof(rcvids);i++) {
 		//	comms_deregister_recv(m_radio, &m_receivers[i]);
 		//}
-		signal SplitControl.stopDone(SUCCESS);
 		m_state = ST_OFF;
+		signal SplitControl.stopDone(SUCCESS);
 	}
 
 	// SplitControl interface

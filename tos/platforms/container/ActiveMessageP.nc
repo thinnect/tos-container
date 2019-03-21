@@ -58,6 +58,8 @@ implementation {
 
 	comms_layer_t* m_radio = NULL;
 
+	bool m_radio_set_up = FALSE;
+
 	int container_am_radio_init(comms_layer_t* cl) @C() @spontaneous() {
 		m_radio = cl;
 		return 0;
@@ -153,25 +155,28 @@ implementation {
 				}
 				else err1("rcv cpy");
 			}
-			else warn("rcv bsy");
+			else warn1("rcv bsy");
 		}
-		else warn("rcv off");
+		else warn1("rcv off");
 	}
 
 	task void startDone() {
-		uint8_t i;
-		for(i=0;i<sizeof(rcvids);i++) {
-			comms_register_recv(m_radio, &m_receivers[i], commsReceive, NULL, rcvids[i]);
+		if(m_radio_set_up == FALSE) {
+			uint8_t i;
+			for(i=0;i<sizeof(rcvids);i++) {
+				comms_register_recv(m_radio, &m_receivers[i], commsReceive, NULL, rcvids[i]);
+			}
+			m_radio_set_up = TRUE;
 		}
 		signal SplitControl.startDone(SUCCESS);
 		m_state = ST_RUNNING; // Will not let anything be done from the startDone event
 	}
 
 	task void stopDone() {
-		uint8_t i;
-		for(i=0;i<sizeof(rcvids);i++) {
-			comms_deregister_recv(m_radio, &m_receivers[i]);
-		}
+		//uint8_t i;
+		//for(i=0;i<sizeof(rcvids);i++) {
+		//	comms_deregister_recv(m_radio, &m_receivers[i]);
+		//}
 		signal SplitControl.stopDone(SUCCESS);
 		m_state = ST_OFF;
 	}

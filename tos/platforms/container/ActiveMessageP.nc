@@ -227,7 +227,6 @@ implementation {
 	}
 
 	void commsSendDone(comms_layer_t* comms, comms_msg_t* msg, comms_error_t result, void* user) {
-		s_tosmsg = user;
 		if(result == COMMS_SUCCESS) {
 			s_result = SUCCESS;
 		}
@@ -249,6 +248,7 @@ implementation {
 				comms_error_t err = comms_send(m_radio, &s_commsmsg, &commsSendDone, msg);
 				debug1("send(%p)=%d\n", &s_commsmsg, err);
 				if(err == COMMS_SUCCESS) {
+					s_tosmsg = msg;
 					return SUCCESS;
 				}
 				return FAIL;

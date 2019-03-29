@@ -52,6 +52,10 @@ implementation {
 			debug1("start[%d] 0x%x %"PRIu32"+%"PRIu32, tmr, timers[tmr], ta - dt, dt);
 		#endif
 
+		if(dt == 0) { // TODO special handling? use a task and call it from there?
+			dt = 1; // osTimerStart does not accept 0
+		}
+
 		atomic {
 			alarm[tmr] = ta;
 			osTimerStart(timers[tmr], dt);
@@ -59,7 +63,7 @@ implementation {
 	}
 
 	async command void Alarm.stop[uint8_t tmr]() {
-		if (osTimerIsRunning(timers[tmr])) {
+		if(osTimerIsRunning(timers[tmr])) {
 			
 			#ifdef ACM_DEBUG
 				debug1("stp[%d] 0x%x", tmr, timers[tmr]);
@@ -81,8 +85,12 @@ implementation {
 		#endif
 
 		atomic {
+			uint32_t tdt = ta - call Counter.get();
+			if(tdt == 0) { // TODO special handling
+				tdt = 1;
+			}
 			alarm[tmr] = ta;
-			osTimerStart(timers[tmr], ta - call Counter.get());
+			osTimerStart(timers[tmr], tdt);
 		}
 	}
 
@@ -117,3 +125,4 @@ implementation {
 	// async event void Counter.overflow();
 
 }
+

@@ -246,7 +246,7 @@ implementation {
 
 			if(tosToComms(&s_commsmsg, msg) == SUCCESS) {
 				comms_error_t err = comms_send(m_radio, &s_commsmsg, &commsSendDone, msg);
-				debug1("send(%p)=%d\n", &s_commsmsg, err);
+				debug1("send(%p)=%d", &s_commsmsg, err);
 				if(err == COMMS_SUCCESS) {
 					s_tosmsg = msg;
 					return SUCCESS;
@@ -515,7 +515,7 @@ implementation {
 
 			if(tosToComms(&s_tr_commsmsg, msg) == SUCCESS) {
 				comms_error_t err = comms_send(m_radio, &s_tr_commsmsg, &commsTimestampRadioSendDone, msg);
-				debug1("send(%p)=%d\n", &s_tr_commsmsg, err);
+				debug1("send(%p)=%d", &s_tr_commsmsg, err);
 				if(err == COMMS_SUCCESS) {
 					s_tr_tosmsg = msg;
 					return SUCCESS;
@@ -579,7 +579,7 @@ implementation {
 
 			if(tosToComms(&s_tm_commsmsg, msg) == SUCCESS) {
 				comms_error_t err = comms_send(m_radio, &s_tm_commsmsg, &commsTimestampMilliSendDone, msg);
-				debug1("send(%p)=%d\n", &s_tm_commsmsg, err);
+				debug1("send(%p)=%d", &s_tm_commsmsg, err);
 				if(err == COMMS_SUCCESS) {
 					s_tm_tosmsg = msg;
 					return SUCCESS;

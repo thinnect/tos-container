@@ -41,11 +41,13 @@ implementation {
 	// -----
 
 	void timer_callback(void* argument) @C() {
-		uint8_t tmr = (argument - (void*)timers)/sizeof(void*);
-		if(tmr >= ALARM_COUNT) {
-			err1("tmr %"PRIu8, tmr);
+		atomic {
+			uint8_t tmr = (argument - (void*)timers)/sizeof(void*);
+			if(tmr >= ALARM_COUNT) {
+				err1("tmr %"PRIu8, tmr);
+			}
+			signal Alarm.fired[tmr]();
 		}
-		signal Alarm.fired[tmr]();
 	}
 
 	async command void Alarm.start[uint8_t tmr](uint32_t dt) {

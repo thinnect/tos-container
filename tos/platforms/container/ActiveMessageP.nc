@@ -36,6 +36,9 @@ module ActiveMessageP {
 	}
 	uses {
 		interface LocalTime<TMilli> as LocalTimeMilli;
+
+		interface Queue<message_t*> as RxQueue;
+		interface Pool<message_t> as RxPool;
 	}
 }
 implementation {
@@ -126,40 +129,68 @@ implementation {
 		return SUCCESS;
 	}
 
-	message_t r_msg_mem;
-	message_t* r_tosmsg = &r_msg_mem;
-	bool r_busy = FALSE;
-
 	default event message_t* Receive.receive[uint8_t id](message_t* msg, void* payload, uint8_t length) { return msg; }
 
 	task void receivedMessage() {
-		if(m_state == ST_RUNNING) {
-			uint8_t length = call Packet.payloadLength(r_tosmsg);
+		message_t* msg = NULL;
+		atomic {
+			while(!call RxQueue.empty()) {
+				msg = call RxQueue.dequeue();
+				if(m_state != ST_RUNNING) {
+					debug1("rcv off q:%d", call RxQueue.size());
+					call RxPool.put(msg);
+				}
+				else {
+					break; // process the message
+				}
+			}
+		}
+		if(msg != NULL) {
+			uint8_t length = call Packet.payloadLength(msg);
 
-			if(call TimeSyncPacketMilli.isValid(r_tosmsg)) {
-				debug1("rcv %02X %04X age=%"PRIi32, call AMPacket.type(r_tosmsg), call AMPacket.source(r_tosmsg), call LocalTimeMilli.get() - call TimeSyncPacketMilli.eventTime(r_tosmsg));
+			if(call TimeSyncPacketMilli.isValid(msg)) {
+				debug1("rcv %02"PRIX8" %04"PRIX16" r:%"PRIu8" age=%"PRIi32,
+					   call AMPacket.type(msg), call AMPacket.source(msg),
+                       call PacketRSSI.get(msg),
+				       call LocalTimeMilli.get() - call TimeSyncPacketMilli.eventTime(msg));
 			}
 			else {
-				debug1("rcv %02X %04X", call AMPacket.type(r_tosmsg), call AMPacket.source(r_tosmsg));
+				debug1("rcv %02"PRIX8" %04"PRIX16" r:%"PRIu8,
+					   call AMPacket.type(msg), call AMPacket.source(msg),
+					   call PacketRSSI.get(msg));
 			}
 
-			r_tosmsg = signal Receive.receive[call AMPacket.type(r_tosmsg)](r_tosmsg, call Packet.getPayload(r_tosmsg, length), length);
+			msg = signal Receive.receive[call AMPacket.type(msg)](msg, call Packet.getPayload(msg, length), length);
+
+			atomic {
+				call RxPool.put(msg);
+				if(!call RxQueue.empty()) {
+					post receivedMessage();
+				}
+			}
 		}
-		r_busy = FALSE;
 	}
 
 	void commsReceive(comms_layer_t* comms, const comms_msg_t* msg, void* user) {
-		if(m_state == ST_RUNNING) {
-			if(r_busy == FALSE) {
-				if(commsToTos(r_tosmsg, msg) == SUCCESS) {
-					r_busy = TRUE;
-					post receivedMessage();
+		atomic {
+			if(m_state == ST_RUNNING) {
+				message_t* pm = call RxPool.get();
+				if(pm != NULL) {
+					if(commsToTos(pm, msg) == SUCCESS) {
+						error_t r = call RxQueue.enqueue(pm);
+						if(r == SUCCESS) {
+							post receivedMessage();
+							return;
+						}
+						else warn1("rcv e:%d q:%d", r, call RxQueue.size());
+					}
+					else err1("rcv cpy");
+					call RxPool.put(pm);
 				}
-				else err1("rcv cpy");
+				else warn1("rcv p:%d q:%d", call RxPool.size(), call RxQueue.size());
 			}
-			else warn1("rcv bsy");
+			else debug1("rcv off");
 		}
-		else warn1("rcv off");
 	}
 
 	task void startDone() {

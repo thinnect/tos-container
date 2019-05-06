@@ -72,6 +72,12 @@ implementation {
 	TimeSyncAMSendMilli = ActiveMessageP.TimeSyncAMSendMilli;
 	TimeSyncPacketMilli = ActiveMessageP.TimeSyncPacketMilli;
 
+	components new QueueC(message_t*, 3) as RxQueueC;
+	ActiveMessageP.RxQueue -> RxQueueC;
+
+	components new PoolC(message_t, 3) as RxPoolC;
+	ActiveMessageP.RxPool -> RxPoolC;
+
 	components LocalTimeMilliC;
 	ActiveMessageP.LocalTimeMilli -> LocalTimeMilliC;
 

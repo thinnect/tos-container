@@ -139,6 +139,7 @@ implementation {
 				if(m_state != ST_RUNNING) {
 					debug1("rcv off q:%d", call RxQueue.size());
 					call RxPool.put(msg);
+					msg = NULL;
 				}
 				else {
 					break; // process the message

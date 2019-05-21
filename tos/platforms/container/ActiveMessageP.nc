@@ -56,7 +56,7 @@ implementation {
 
 	uint8_t m_state = ST_OFF;
 
-	const uint8_t rcvids[] = {0x3D, 0xB0, 0xB1, 0xB2, 0xB7}; // TODO the list should come from build process
+	const uint8_t rcvids[] = {0xB0, 0xB1, 0xB2, 0xB3, 0xB4, 0xB5, 0xB7}; // TODO the list should come from build process
 	comms_receiver_t m_receivers[sizeof(rcvids)];
 
 	comms_layer_t* m_radio = NULL;

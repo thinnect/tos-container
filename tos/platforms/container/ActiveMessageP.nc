@@ -98,33 +98,37 @@ implementation {
 		return SUCCESS;
 	}
 
-	error_t commsToTos(message_t* msg, const comms_msg_t* cmsg) {
+	error_t commsToTos(message_t* msg, const comms_msg_t* cmsg, bool rx) {
 		uint8_t len = comms_get_payload_length(m_radio, cmsg);
 		void* payload;
 
-		call Packet.clear(msg);
+		if(rx) {  // Keep existing contents for TX messages
+			call Packet.clear(msg);
 
-		call AMPacket.setType(msg, comms_get_packet_type(m_radio, cmsg));
-		call AMPacket.setDestination(msg, comms_am_get_destination(m_radio, cmsg));
-		call AMPacket.setSource(msg, comms_am_get_source(m_radio, cmsg));
+			call AMPacket.setType(msg, comms_get_packet_type(m_radio, cmsg));
+			call AMPacket.setDestination(msg, comms_am_get_destination(m_radio, cmsg));
+			call AMPacket.setSource(msg, comms_am_get_source(m_radio, cmsg));
 
+			((radio_metadata_t*)(msg->metadata))->event_time = comms_get_event_time(m_radio, cmsg);
+			((radio_metadata_t*)(msg->metadata))->event_time_valid = comms_event_time_valid(m_radio, cmsg);
+
+			call PacketLinkQuality.set(msg, comms_get_lqi(m_radio, cmsg));
+			call PacketRSSI.set(msg, (90+comms_get_rssi(m_radio, cmsg))/3 + 1); // RFR2 RSSI 0-28 units
+
+			payload = call Packet.getPayload(msg, len);
+			if(payload == NULL) {
+				return ESIZE;
+			}
+			memcpy(payload, comms_get_payload(m_radio, cmsg, len), len);
+			call Packet.setPayloadLength(msg, len);
+		}
+		else {
+			((radio_metadata_t*)(msg->metadata))->ack_received = comms_ack_received(m_radio, cmsg);
+		}
+
+		// Timestamp is sending start time for TX and sync start for RX
 		((radio_metadata_t*)(msg->metadata))->timestamp = comms_get_timestamp(m_radio, cmsg);
 		((radio_metadata_t*)(msg->metadata))->timestamp_valid = comms_timestamp_valid(m_radio, cmsg);
-
-		((radio_metadata_t*)(msg->metadata))->event_time = comms_get_event_time(m_radio, cmsg);
-		((radio_metadata_t*)(msg->metadata))->event_time_valid = comms_event_time_valid(m_radio, cmsg);
-
-		((radio_metadata_t*)(msg->metadata))->ack_received = comms_ack_received(m_radio, cmsg);
-
-		call PacketLinkQuality.set(msg, comms_get_lqi(m_radio, cmsg));
-		call PacketRSSI.set(msg, (90+comms_get_rssi(m_radio, cmsg))/3 + 1); // RFR2 RSSI 0-28 units
-
-		payload = call Packet.getPayload(msg, len);
-		if(payload == NULL) {
-			return ESIZE;
-		}
-		memcpy(payload, comms_get_payload(m_radio, cmsg, len), len);
-		call Packet.setPayloadLength(msg, len);
 
 		return SUCCESS;
 	}
@@ -177,7 +181,7 @@ implementation {
 			if(m_state == ST_RUNNING) {
 				message_t* pm = call RxPool.get();
 				if(pm != NULL) {
-					if(commsToTos(pm, msg) == SUCCESS) {
+					if(commsToTos(pm, msg, TRUE) == SUCCESS) {
 						error_t r = call RxQueue.enqueue(pm);
 						if(r == SUCCESS) {
 							post receivedMessage();
@@ -252,7 +256,7 @@ implementation {
 		if(s_tosmsg != NULL) {
 			message_t* m = s_tosmsg;
 			s_tosmsg = NULL;
-			commsToTos(m, &s_commsmsg);
+			commsToTos(m, &s_commsmsg, FALSE);
 			debug1("asnt");
 			signal AMSend.sendDone[call AMPacket.type(m)](m, s_result);
 		}
@@ -519,7 +523,7 @@ implementation {
 		if(s_tr_tosmsg != NULL) {
 			message_t* m = s_tr_tosmsg;
 			s_tr_tosmsg = NULL;
-			commsToTos(m, &s_tr_commsmsg);
+			commsToTos(m, &s_tr_commsmsg, FALSE);
 			debug1("trsnt");
 			signal TimeSyncAMSendRadio.sendDone[call AMPacket.type(m)](m, s_tr_result);
 		}
@@ -583,7 +587,7 @@ implementation {
 		if(s_tm_tosmsg != NULL) {
 			message_t* m = s_tm_tosmsg;
 			s_tm_tosmsg = NULL;
-			commsToTos(m, &s_tm_commsmsg);
+			commsToTos(m, &s_tm_commsmsg, FALSE);
 			debug1("tmsnt");
 			signal TimeSyncAMSendMilli.sendDone[call AMPacket.type(m)](m, s_tm_result);
 		}

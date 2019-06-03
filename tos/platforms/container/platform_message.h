@@ -27,6 +27,9 @@ typedef struct radio_metadata {
 
 	bool ack_requested;
 	bool ack_received;
+
+	uint16_t retries;
+	uint32_t timeout;
 } radio_metadata_t;
 
 typedef union message_metadata {

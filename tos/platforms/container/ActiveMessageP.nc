@@ -87,6 +87,9 @@ implementation {
 		}
 
 		comms_set_ack_required(m_radio, cmsg, ((radio_metadata_t*)(msg->metadata))->ack_requested);
+		comms_set_retries(m_radio, cmsg, ((radio_metadata_t*)(msg->metadata))->retries);
+		comms_set_timeout(m_radio, cmsg, ((radio_metadata_t*)(msg->metadata))->timeout);
+		comms_set_retries_used(m_radio, cmsg, 0);
 
 		payload = comms_get_payload(m_radio, cmsg, len);
 		if(payload == NULL) {
@@ -428,13 +431,20 @@ implementation {
 	// PacketLink interface
 	command void PacketLink.setRetries(message_t *msg, uint16_t maxRetries) {
 		((radio_metadata_t*)(msg->metadata))->ack_requested = TRUE;
+		((radio_metadata_t*)(msg->metadata))->retries = (uint8_t)maxRetries;
 	}
 
-	command void PacketLink.setRetryDelay(message_t *msg, uint16_t retryDelay) { }
+	command void PacketLink.setRetryDelay(message_t *msg, uint16_t retryDelay) {
+		((radio_metadata_t*)(msg->metadata))->timeout = retryDelay;
+	}
 
-  	command uint16_t PacketLink.getRetries(message_t *msg) { return 0; }
+  	command uint16_t PacketLink.getRetries(message_t *msg) { 
+  		return ((radio_metadata_t*)(msg->metadata))->retries;
+  	}
 
-	command uint16_t PacketLink.getRetryDelay(message_t *msg) { return 0; }
+	command uint16_t PacketLink.getRetryDelay(message_t *msg) { 
+		return ((radio_metadata_t*)(msg->metadata))->timeout;
+	}
 
   	command bool PacketLink.wasDelivered(message_t *msg) {
   		return ((radio_metadata_t*)(msg->metadata))->ack_received;

@@ -1,5 +1,8 @@
 #include "Timer.h"
 #include "cmsis_os2.h"
+#include "/home/madis/thinnect/thinnect.silabs-basesystem/zoo/thinnect.silabs-rtcc-timer/zoo/thinnect.lptimer/lptimer.h"
+//#include "/home/madis/thinnect/thinnect.silabs-basesystem/zoo/thinnect.silabs-rtcc-timer/zoo/thinnect.lptimer/platform_lptimer.h"
+
 module AlarmCounterMilli32P {
 	provides interface Init;
 	provides interface Alarm<TMilli, uint32_t>[uint8_t timer];
@@ -20,6 +23,10 @@ implementation {
 	osTimerId_t timers[ALARM_COUNT];
 	uint32_t alarm[ALARM_COUNT];
 
+    lpTimer_t lp_timers[ALARM_COUNT];
+    void* arguments[ALARM_COUNT];
+    lpTimerAttr_t attributes[ALARM_COUNT];
+
 	void timer_callback(void* argument);
 
 	command error_t Init.init() {
@@ -31,7 +38,11 @@ implementation {
 
 		atomic {
 			for(i=0;i<ALARM_COUNT;i++) {
-				timers[i] = osTimerNew(&timer_callback, osTimerOnce, &timers[i], NULL);
+				//timers[i] = osTimerNew(&timer_callback, osTimerOnce, &timers[i], NULL);
+                if (lpTimerInit(&lp_timers[i], timer_callback, lpTimerOnce, &arguments[i], &attributes[i]) != osOK)
+                {
+                    err1("Cannot init tmr!");
+                }
 				alarm[i] = call Counter.get();
 			}
 		}
@@ -42,7 +53,7 @@ implementation {
 
 	void timer_callback(void* argument) @C() {
 		atomic {
-			uint8_t tmr = (argument - (void*)timers)/sizeof(void*);
+			uint8_t tmr = (argument - (void*)arguments)/sizeof(void*);
 			if(tmr >= ALARM_COUNT) {
 				err1("tmr %"PRIu8, tmr);
 			}
@@ -52,7 +63,7 @@ implementation {
 
 	async command void Alarm.start[uint8_t tmr](uint32_t dt) {
 		#ifdef ACM_DEBUG
-			debug1("start[%"PRIu8"] %p %"PRIu32, tmr, timers[tmr], dt);
+			debug1("start[%"PRIu8"] %p %"PRIu32, tmr, &lp_timers[tmr], dt);
 		#endif
 
 		if(dt == 0) { // TODO special handling? use a task and call it from there?
@@ -63,35 +74,37 @@ implementation {
 			warn1("long tmr[%"PRIu8"] %"PRIu32, tmr, dt);
 		}
 
-		atomic {
-			osStatus_t rslt;
-			alarm[tmr] = call Counter.get() + dt;
-
-			rslt = osTimerStart(timers[tmr], dt);
-			if(rslt != osOK) {
-				err1("tmr["PRIu8"] death %d", tmr, rslt);
-			}
-		}
-	}
+		atomic 
+        {
+            osStatus_t rslt;
+            alarm[tmr] = call Counter.get() + dt;
+            //rslt = osTimerStart(timers[tmr], dt);
+            rslt = lpTimerStart(&lp_timers[tmr], dt);
+            if (rslt != osOK)
+            {
+                err1("tmr["PRIu8"] death %d", tmr, rslt);
+            }
+        }
+    }
 
 	async command void Alarm.stop[uint8_t tmr]() {
 		atomic {
-			if(osTimerIsRunning(timers[tmr])) {
+			if(lpTimerIsRunning(&lp_timers[tmr])) {
 				#ifdef ACM_DEBUG
-					debug1("stp[%"PRIu8"] %p", tmr, timers[tmr]);
+					debug1("stp[%"PRIu8"] %p", tmr, &lp_timers[tmr]);
 				#endif
-				osTimerStop(timers[tmr]);
+				lpTimerStop(&lp_timers[tmr]);
 			}
 		}
 	}
 
 	async command bool Alarm.isRunning[uint8_t tmr]() {
-		atomic return osTimerIsRunning(timers[tmr]) == 1;
+		atomic return lpTimerIsRunning(&lp_timers[tmr]);
 	}
 
 	async command void Alarm.startAt[uint8_t tmr](uint32_t t0, uint32_t dt) {
 		#ifdef ACM_DEBUG
-			debug1("startAt[%"PRIu8"] %p %"PRIu32"+%"PRIu32, tmr, timers[tmr], t0, dt);
+			debug1("startAt[%"PRIu8"] %p %"PRIu32"+%"PRIu32, tmr, &lp_timers[tmr], t0, dt);
 		#endif
 
 		atomic {
@@ -110,7 +123,8 @@ implementation {
 
 			alarm[tmr] = t0 + dt; // Does this make sense if this is in the past?
 
-			rslt = osTimerStart(timers[tmr], tdt);
+			// rslt = osTimerStart(timers[tmr], tdt);
+            rslt = lpTimerStart(&lp_timers[tmr], tdt);
 			if(rslt != osOK) {
 				err1("tmr["PRIu8"] death %d", tmr, rslt);
 			}
@@ -133,7 +147,8 @@ implementation {
 	// -----
 
 	async command uint32_t Counter.get() {
-		return osCounterMilliGet();
+		//return osCounterMilliGet();
+        return lpTimerGetNow();
 	}
 
 	async command bool Counter.isOverflowPending() {
@@ -146,6 +161,5 @@ implementation {
 	}
 
 	// async event void Counter.overflow();
-
 }
 

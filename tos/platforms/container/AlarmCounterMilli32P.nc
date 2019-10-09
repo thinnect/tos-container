@@ -26,6 +26,7 @@ implementation {
     lpTimer_t lp_timers[ALARM_COUNT];
     void* arguments[ALARM_COUNT];
     lpTimerAttr_t attributes[ALARM_COUNT];
+    const char m_names[3][2] = {"1", "2", "3"};
 
 	void timer_callback(void* argument);
 
@@ -38,6 +39,8 @@ implementation {
 
 		atomic {
 			for(i=0;i<ALARM_COUNT;i++) {
+                attributes[i].name = m_names[i % 3];
+                attributes[i].priority = 255;
 				//timers[i] = osTimerNew(&timer_callback, osTimerOnce, &timers[i], NULL);
                 if (lpTimerInit(&lp_timers[i], timer_callback, lpTimerOnce, &arguments[i], &attributes[i]) != osOK)
                 {

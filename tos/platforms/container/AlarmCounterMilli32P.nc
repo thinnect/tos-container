@@ -61,12 +61,15 @@ implementation {
 				err1("tmr %"PRIu8, tmr);
 			}
 			signal Alarm.fired[tmr]();
+            #ifdef ACM_DEBUG
+                debug1("Fired:%u", tmr);
+            #endif
 		}
 	}
 
 	async command void Alarm.start[uint8_t tmr](uint32_t dt) {
 		#ifdef ACM_DEBUG
-			debug1("start[%"PRIu8"] %p %"PRIu32, tmr, &lp_timers[tmr], dt);
+			debug1("start[%"PRIu8"] %"PRIu32, tmr, dt);
 		#endif
 
 		if(dt == 0) { // TODO special handling? use a task and call it from there?
@@ -94,7 +97,7 @@ implementation {
 		atomic {
 			if(lpTimerIsRunning(&lp_timers[tmr])) {
 				#ifdef ACM_DEBUG
-					debug1("stp[%"PRIu8"] %p", tmr, &lp_timers[tmr]);
+					debug1("stp[%"PRIu8"]", tmr);
 				#endif
 				lpTimerStop(&lp_timers[tmr]);
 			}
@@ -107,7 +110,7 @@ implementation {
 
 	async command void Alarm.startAt[uint8_t tmr](uint32_t t0, uint32_t dt) {
 		#ifdef ACM_DEBUG
-			debug1("startAt[%"PRIu8"] %p %"PRIu32"+%"PRIu32, tmr, &lp_timers[tmr], t0, dt);
+			debug1("startAt[%"PRIu8"] %"PRIu32"+%"PRIu32, tmr, t0, dt);
 		#endif
 
 		atomic {

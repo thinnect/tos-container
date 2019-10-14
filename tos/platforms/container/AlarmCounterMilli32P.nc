@@ -12,6 +12,7 @@ implementation {
 	#include "log.h"
 
 	extern uint32_t osCounterMilliGet() @C();
+	extern void notify_resume_container() @C();
 
 	enum {
 		ALARM_COUNT = uniqueCount("AlarmMilli32C")
@@ -48,6 +49,7 @@ implementation {
 			}
 			signal Alarm.fired[tmr]();
 		}
+		notify_resume_container();
 	}
 
 	async command void Alarm.start[uint8_t tmr](uint32_t dt) {

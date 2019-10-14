@@ -47,6 +47,8 @@ implementation {
 	#define __LOG_LEVEL__ (LOG_LEVEL_ActiveMessageP & BASE_LOG_LEVEL)
 	#include "log.h"
 
+	extern void notify_resume_container() @C();
+
 	enum ActiveMessageStates {
 		ST_OFF,
 		ST_STARTING,
@@ -188,6 +190,7 @@ implementation {
 						error_t r = call RxQueue.enqueue(pm);
 						if(r == SUCCESS) {
 							post receivedMessage();
+							notify_resume_container();
 							return;
 						}
 						else warn1("rcv e:%d q:%d", r, call RxQueue.size());
@@ -199,6 +202,7 @@ implementation {
 			}
 			else debug1("rcv off");
 		}
+		notify_resume_container();
 	}
 
 	task void startDone() {
@@ -266,14 +270,18 @@ implementation {
 	}
 
 	void commsSendDone(comms_layer_t* comms, comms_msg_t* msg, comms_error_t result, void* user) {
-		if(result == COMMS_SUCCESS) {
-			s_result = SUCCESS;
+		
+		atomic {
+			if(result == COMMS_SUCCESS) {
+				s_result = SUCCESS;
+			}
+			else {
+				s_result = FAIL; // TODO map failure values
+			}
+			post sendDone();
 		}
-		else {
-			s_result = FAIL; // TODO map failure values
-		}
-		post sendDone();
-	}
+		notify_resume_container();
+	}	
 
 	// AMSend interface
 	command error_t AMSend.send[uint8_t id](am_addr_t addr, message_t* msg, uint8_t len) {
@@ -421,11 +429,15 @@ implementation {
 	// LowPowerListening interface
 	command void LowPowerListening.setLocalWakeupInterval(uint16_t intervalMs) { }
 
-	command uint16_t LowPowerListening.getLocalWakeupInterval() { return 0; }
+	command uint16_t LowPowerListening.getLocalWakeupInterval() {
+		return 0;
+	}
 
 	command void LowPowerListening.setRemoteWakeupInterval(message_t *msg, uint16_t intervalMs) { }
 
-	command uint16_t LowPowerListening.getRemoteWakeupInterval(message_t *msg) { return 0; }
+	command uint16_t LowPowerListening.getRemoteWakeupInterval(message_t *msg) {
+		return 0;
+	}
 	// -------------------------------------------------------------------------
 
 	// PacketLink interface
@@ -530,6 +542,7 @@ implementation {
 	error_t s_tr_result;
 
 	task void timeSyncRadioSendDone() {
+		
 		if(s_tr_tosmsg != NULL) {
 			message_t* m = s_tr_tosmsg;
 			s_tr_tosmsg = NULL;
@@ -540,13 +553,17 @@ implementation {
 	}
 
 	void commsTimestampRadioSendDone(comms_layer_t* comms, comms_msg_t* msg, comms_error_t result, void* user) {
-		if(result == COMMS_SUCCESS) {
-			s_tr_result = SUCCESS;
+		
+		atomic {
+			if(result == COMMS_SUCCESS) {
+				s_tr_result = SUCCESS;
+			}
+			else {
+				s_tr_result = FAIL; // TODO map failure values
+			}
+			post timeSyncRadioSendDone();
 		}
-		else {
-			s_tr_result = FAIL; // TODO map failure values
-		}
-		post timeSyncRadioSendDone();
+		notify_resume_container();
 	}
 
 	// TimeSyncAMSendRadio interface
@@ -594,23 +611,31 @@ implementation {
 	error_t s_tm_result;
 
 	task void timeSyncMilliSendDone() {
-		if(s_tm_tosmsg != NULL) {
-			message_t* m = s_tm_tosmsg;
-			s_tm_tosmsg = NULL;
-			commsToTos(m, &s_tm_commsmsg, FALSE);
-			debug1("tmsnt");
-			signal TimeSyncAMSendMilli.sendDone[call AMPacket.type(m)](m, s_tm_result);
+		
+		atomic {
+			if(s_tm_tosmsg != NULL) {
+				message_t* m = s_tm_tosmsg;
+				s_tm_tosmsg = NULL;
+				commsToTos(m, &s_tm_commsmsg, FALSE);
+				debug1("tmsnt");
+				signal TimeSyncAMSendMilli.sendDone[call AMPacket.type(m)](m, s_tm_result);
+			}
 		}
+		notify_resume_container();
 	}
 
 	void commsTimestampMilliSendDone(comms_layer_t* comms, comms_msg_t* msg, comms_error_t result, void* user) {
-		if(result == COMMS_SUCCESS) {
-			s_tm_result = SUCCESS;
+		
+		atomic {
+			if(result == COMMS_SUCCESS) {
+				s_tm_result = SUCCESS;
+			}
+			else {
+				s_tm_result = FAIL; // TODO map failure values
+			}
+			post timeSyncMilliSendDone();
 		}
-		else {
-			s_tm_result = FAIL; // TODO map failure values
-		}
-		post timeSyncMilliSendDone();
+		notify_resume_container();
 	}
 
 	// TimeSyncAMSendMilli interface

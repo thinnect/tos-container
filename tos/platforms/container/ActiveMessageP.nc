@@ -57,6 +57,7 @@ implementation {
 	};
 
 	uint8_t m_state = ST_OFF;
+	bool m_control_error = FALSE; // norace
 
 	const uint8_t rcvids[] = {0xB0, 0xB1, 0xB2, 0xB3, 0xB4, 0xB5, 0xB7}; // TODO the list should come from build process
 	comms_receiver_t m_receivers[sizeof(rcvids)];
@@ -206,24 +207,62 @@ implementation {
 	}
 
 	task void startDone() {
-		if(m_radio_set_up == FALSE) {
+		error_t result = SUCCESS;
+
+		if(m_control_error) {
+			m_state = ST_OFF;
+			result = FAIL;
+		}
+		else {
+			m_state = ST_RUNNING;
+		}
+
+		if((result == SUCCESS) && (m_radio_set_up == FALSE)) {
 			uint8_t i;
 			for(i=0;i<sizeof(rcvids);i++) {
 				comms_register_recv(m_radio, &m_receivers[i], commsReceive, NULL, rcvids[i]);
 			}
 			m_radio_set_up = TRUE;
 		}
-		signal SplitControl.startDone(SUCCESS);
-		m_state = ST_RUNNING; // Will not let anything be done from the startDone event
+
+		signal SplitControl.startDone(result);
 	}
 
 	task void stopDone() {
+		error_t result = SUCCESS;
 		//uint8_t i;
 		//for(i=0;i<sizeof(rcvids);i++) {
 		//	comms_deregister_recv(m_radio, &m_receivers[i]);
 		//}
-		m_state = ST_OFF;
-		signal SplitControl.stopDone(SUCCESS);
+		if(m_control_error) {
+			m_state = ST_RUNNING;
+			result = FAIL;
+		}
+		else {
+			m_state = ST_OFF;
+		}
+
+		signal SplitControl.stopDone(result);
+	}
+
+	void radio_start_done(comms_layer_t* comms, comms_status_t status, void* user) {
+		debug1("startd %d", status);
+		if(COMMS_STARTED != status)
+		{
+			err1("start fail!");
+			m_control_error = TRUE;
+		}
+		post startDone();
+	}
+
+	void radio_stop_done(comms_layer_t* comms, comms_status_t status, void* user) {
+		debug1("stopd %d", status);
+		if(COMMS_STOPPED != status)
+		{
+			err1("stop fail!");
+			m_control_error = TRUE;
+		}
+		post stopDone();
 	}
 
 	// SplitControl interface
@@ -235,9 +274,12 @@ implementation {
 			return EALREADY;
 		}
 		if(m_state == ST_OFF) {
-			m_state = ST_STARTING;
-			post startDone();
-			return SUCCESS;
+			comms_error_t rslt = comms_start(m_radio, radio_start_done, NULL);
+			if(rslt == COMMS_SUCCESS) {
+				m_state = ST_STARTING;
+				return SUCCESS;
+			}
+			return FAIL;
 		}
 		return EBUSY;
 	}
@@ -247,9 +289,11 @@ implementation {
 			return EALREADY;
 		}
 		if(m_state == ST_RUNNING) {
-			m_state = ST_STOPPING;
-			post stopDone();
-			return SUCCESS;
+			comms_error_t rslt = comms_start(m_radio, radio_stop_done, NULL);
+			if(rslt == COMMS_SUCCESS) {
+				m_state = ST_STOPPING;
+				return SUCCESS;
+			}
 		}
 		return EBUSY;
 	}
@@ -270,7 +314,7 @@ implementation {
 	}
 
 	void commsSendDone(comms_layer_t* comms, comms_msg_t* msg, comms_error_t result, void* user) {
-		
+
 		atomic {
 			if(result == COMMS_SUCCESS) {
 				s_result = SUCCESS;
@@ -281,7 +325,7 @@ implementation {
 			post sendDone();
 		}
 		notify_resume_container();
-	}	
+	}
 
 	// AMSend interface
 	command error_t AMSend.send[uint8_t id](am_addr_t addr, message_t* msg, uint8_t len) {
@@ -450,11 +494,11 @@ implementation {
 		((radio_metadata_t*)(msg->metadata))->timeout = retryDelay;
 	}
 
-  	command uint16_t PacketLink.getRetries(message_t *msg) { 
+  	command uint16_t PacketLink.getRetries(message_t *msg) {
   		return ((radio_metadata_t*)(msg->metadata))->retries;
   	}
 
-	command uint16_t PacketLink.getRetryDelay(message_t *msg) { 
+	command uint16_t PacketLink.getRetryDelay(message_t *msg) {
 		return ((radio_metadata_t*)(msg->metadata))->timeout;
 	}
 
@@ -542,7 +586,7 @@ implementation {
 	error_t s_tr_result;
 
 	task void timeSyncRadioSendDone() {
-		
+
 		if(s_tr_tosmsg != NULL) {
 			message_t* m = s_tr_tosmsg;
 			s_tr_tosmsg = NULL;
@@ -553,7 +597,7 @@ implementation {
 	}
 
 	void commsTimestampRadioSendDone(comms_layer_t* comms, comms_msg_t* msg, comms_error_t result, void* user) {
-		
+
 		atomic {
 			if(result == COMMS_SUCCESS) {
 				s_tr_result = SUCCESS;
@@ -611,7 +655,7 @@ implementation {
 	error_t s_tm_result;
 
 	task void timeSyncMilliSendDone() {
-		
+
 		atomic {
 			if(s_tm_tosmsg != NULL) {
 				message_t* m = s_tm_tosmsg;
@@ -625,7 +669,7 @@ implementation {
 	}
 
 	void commsTimestampMilliSendDone(comms_layer_t* comms, comms_msg_t* msg, comms_error_t result, void* user) {
-		
+
 		atomic {
 			if(result == COMMS_SUCCESS) {
 				s_tm_result = SUCCESS;

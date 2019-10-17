@@ -289,7 +289,7 @@ implementation {
 			return EALREADY;
 		}
 		if(m_state == ST_RUNNING) {
-			comms_error_t rslt = comms_start(m_radio, radio_stop_done, NULL);
+			comms_error_t rslt = comms_stop(m_radio, radio_stop_done, NULL);
 			if(rslt == COMMS_SUCCESS) {
 				m_state = ST_STOPPING;
 				return SUCCESS;

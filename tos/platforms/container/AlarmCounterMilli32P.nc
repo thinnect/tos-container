@@ -1,7 +1,6 @@
 #include "Timer.h"
 #include "cmsis_os2.h"
-#include "/home/madis/thinnect/thinnect.silabs-basesystem/zoo/thinnect.silabs-rtcc-timer/zoo/thinnect.lptimer/lptimer.h"
-//#include "/home/madis/thinnect/thinnect.silabs-basesystem/zoo/thinnect.silabs-rtcc-timer/zoo/thinnect.lptimer/platform_lptimer.h"
+#include "lptimer.h"
 
 module AlarmCounterMilli32P {
 	provides interface Init;

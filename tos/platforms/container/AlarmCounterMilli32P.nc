@@ -26,7 +26,7 @@ implementation {
     lpTimer_t lp_timers[ALARM_COUNT];
     void* arguments[ALARM_COUNT];
     lpTimerAttr_t attributes[ALARM_COUNT];
-    const char m_names[3][2] = {"1", "2", "3"};
+    const char m_names[3][2] = {"0", "1", "2"};
 
 	void timer_callback(void* argument);
 

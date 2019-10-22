@@ -6,17 +6,16 @@ module LedsC {
 }
 implementation {
 
-extern void PLATFORM_SetLed0() @C();
-extern void PLATFORM_SetLed1() @C();
-extern void PLATFORM_SetLed2() @C();
-extern void PLATFORM_ClearLed0() @C();
-extern void PLATFORM_ClearLed1() @C();
-extern void PLATFORM_ClearLed2() @C();
-extern void PLATFORM_ToggleLed0() @C();
-extern void PLATFORM_ToggleLed1() @C();
-extern void PLATFORM_ToggleLed2() @C();
-extern PLATFORM_ToggleGpioPin (uint8_t pin_nr) @C();
-
+    extern void PLATFORM_SetLed0() @C();
+    extern void PLATFORM_SetLed1() @C();
+    extern void PLATFORM_SetLed2() @C();
+    extern void PLATFORM_ClearLed0() @C();
+    extern void PLATFORM_ClearLed1() @C();
+    extern void PLATFORM_ClearLed2() @C();
+    extern void PLATFORM_ToggleLed0() @C();
+    extern void PLATFORM_ToggleLed1() @C();
+    extern void PLATFORM_ToggleLed2() @C();
+    
 	command error_t Init.init() {
 		return SUCCESS;
 	}

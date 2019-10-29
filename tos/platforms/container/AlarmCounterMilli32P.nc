@@ -41,7 +41,7 @@ implementation {
                 attributes[i].name = m_names[i % 3];
                 attributes[i].priority = 255;
 				//timers[i] = osTimerNew(&timer_callback, osTimerOnce, &timers[i], NULL);
-                if (lpTimerInit(&lp_timers[i], timer_callback, lpTimerOnce, &arguments[i], &attributes[i]) != osOK)
+                if (lpTimerInit(i, &lp_timers[i], timer_callback, lpTimerOnce, &arguments[i], &attributes[i]) != osOK)
                 {
                     err1("Cannot init tmr!");
                 }
@@ -59,10 +59,10 @@ implementation {
 			if(tmr >= ALARM_COUNT) {
 				err1("tmr %"PRIu8, tmr);
 			}
-			signal Alarm.fired[tmr]();
             #ifdef ACM_DEBUG
                 debug1("Fired:%u", tmr);
             #endif
+			signal Alarm.fired[tmr]();
 		}
 	}
 
@@ -121,6 +121,10 @@ implementation {
 			if(passed < dt) {
 				tdt = dt - passed;
 			}
+            else
+            {
+                warn1("pssd:%"PRIu32" now:%"PRIu32" t0:%"PRIu32, passed, now, t0);
+            }
 
 			if (tdt > 600000) {
 				warn1("long tmr[%"PRIu8"] %"PRIu32, tmr, tdt);

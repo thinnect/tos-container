@@ -201,9 +201,12 @@ implementation {
 				}
 				else warn1("rcv p:%d q:%d", call RxPool.size(), call RxQueue.size());
 			}
-			else debug1("rcv off");
+			else {
+
+				debug1("rcv off");
+				notify_resume_container();
+			}
 		}
-		notify_resume_container();
 	}
 
 	task void startDone() {
@@ -253,6 +256,7 @@ implementation {
 			m_control_error = TRUE;
 		}
 		post startDone();
+		notify_resume_container();
 	}
 
 	void radio_stop_done(comms_layer_t* comms, comms_status_t status, void* user) {
@@ -263,6 +267,7 @@ implementation {
 			m_control_error = TRUE;
 		}
 		post stopDone();
+		notify_resume_container();
 	}
 
 	// SplitControl interface

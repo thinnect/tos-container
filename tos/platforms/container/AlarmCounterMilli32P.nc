@@ -41,7 +41,7 @@ implementation {
                 attributes[i].name = m_names[i % 3];
                 attributes[i].priority = 255;
 				//timers[i] = osTimerNew(&timer_callback, osTimerOnce, &timers[i], NULL);
-                if (lpTimerInit(i, &lp_timers[i], timer_callback, lpTimerOnce, &arguments[i], &attributes[i]) != osOK)
+                if (channelTimerInit(i, &lp_timers[i], timer_callback, lpTimerOnce, &arguments[i], &attributes[i]) != osOK)
                 {
                     err1("Cannot init tmr!");
                 }
@@ -84,7 +84,7 @@ implementation {
             osStatus_t rslt;
             alarm[tmr] = call Counter.get() + dt;
             //rslt = osTimerStart(timers[tmr], dt);
-            rslt = lpTimerStart(&lp_timers[tmr], dt);
+            rslt = channelTimerStart(tmr, &lp_timers[tmr], dt);
             if (rslt != osOK)
             {
                 err1("tmr["PRIu8"] death %d", tmr, rslt);
@@ -94,17 +94,17 @@ implementation {
 
 	async command void Alarm.stop[uint8_t tmr]() {
 		atomic {
-			if(lpTimerIsRunning(&lp_timers[tmr])) {
+			if(channelTimerIsRunning(&lp_timers[tmr])) {
 				#ifdef ACM_DEBUG
 					debug1("stp[%"PRIu8"]", tmr);
 				#endif
-				lpTimerStop(&lp_timers[tmr]);
+				channelTimerStop(tmr, &lp_timers[tmr]);
 			}
 		}
 	}
 
 	async command bool Alarm.isRunning[uint8_t tmr]() {
-		atomic return lpTimerIsRunning(&lp_timers[tmr]);
+		atomic return channelTimerIsRunning(&lp_timers[tmr]);
 	}
 
 	async command void Alarm.startAt[uint8_t tmr](uint32_t t0, uint32_t dt) {
@@ -133,7 +133,7 @@ implementation {
 			alarm[tmr] = t0 + dt; // Does this make sense if this is in the past?
 
 			// rslt = osTimerStart(timers[tmr], tdt);
-            rslt = lpTimerStart(&lp_timers[tmr], tdt);
+            rslt = channelTimerStart(tmr, &lp_timers[tmr], tdt);
 			if(rslt != osOK) {
 				err1("tmr["PRIu8"] death %d", tmr, rslt);
 			}
@@ -156,8 +156,7 @@ implementation {
 	// -----
 
 	async command uint32_t Counter.get() {
-		//return osCounterMilliGet();
-        return lpTimerGetNow();
+        return channelTimerGetNow();
 	}
 
 	async command bool Counter.isOverflowPending() {

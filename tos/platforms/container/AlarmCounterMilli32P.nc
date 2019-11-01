@@ -62,6 +62,7 @@ implementation {
             #ifdef ACM_DEBUG
                 debug1("Fired:%u", tmr);
             #endif
+            // atomic channelTimerStop(tmr, &lp_timers[tmr]);
 			signal Alarm.fired[tmr]();
 		}
 	}

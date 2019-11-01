@@ -1,6 +1,6 @@
 #include "Timer.h"
 #include "cmsis_os2.h"
-#include "lptimer.h"
+#include "hal_rtcc_drv.h"
 
 module AlarmCounterMilli32P {
 	provides interface Init;
@@ -13,8 +13,6 @@ implementation {
 	#define __LOG_LEVEL__ ( LOG_LEVEL_AlarmCounterMilli32P & BASE_LOG_LEVEL )
 	#include "log.h"
 
-	extern uint32_t osCounterMilliGet() @C();
-
 	enum {
 		ALARM_COUNT = uniqueCount("AlarmMilli32C")
 	};
@@ -22,30 +20,25 @@ implementation {
 	osTimerId_t timers[ALARM_COUNT];
 	uint32_t alarm[ALARM_COUNT];
 
-    lpTimer_t lp_timers[ALARM_COUNT];
+    hal_timer_t lp_timers[ALARM_COUNT];
     void* arguments[ALARM_COUNT];
-    lpTimerAttr_t attributes[ALARM_COUNT];
-    const char m_names[3][2] = {"0", "1", "2"};
 
 	void timer_callback(void* argument);
 
 	command error_t Init.init() {
-		uint8_t i;
+		uint8_t channel;
 
 		#ifdef ACM_DEBUG
 			debug1("alarms %d", ALARM_COUNT);
 		#endif
 
 		atomic {
-			for(i=0;i<ALARM_COUNT;i++) {
-                attributes[i].name = m_names[i % 3];
-                attributes[i].priority = 255;
-				//timers[i] = osTimerNew(&timer_callback, osTimerOnce, &timers[i], NULL);
-                if (channelTimerInit(i, &lp_timers[i], timer_callback, lpTimerOnce, &arguments[i], &attributes[i]) != osOK)
+			for( channel = 0; channel < ALARM_COUNT; channel++) {
+                if (hal_timer_init(channel, &lp_timers[channel], timer_callback, &arguments[channel]) != osOK)
                 {
                     err1("Cannot init tmr!");
                 }
-				alarm[i] = call Counter.get();
+				alarm[channel] = call Counter.get();
 			}
 		}
 		return SUCCESS;
@@ -85,7 +78,7 @@ implementation {
             osStatus_t rslt;
             alarm[tmr] = call Counter.get() + dt;
             //rslt = osTimerStart(timers[tmr], dt);
-            rslt = channelTimerStart(tmr, &lp_timers[tmr], dt);
+            rslt = hal_timer_start(&lp_timers[tmr], dt);
             if (rslt != osOK)
             {
                 err1("tmr["PRIu8"] death %d", tmr, rslt);
@@ -95,17 +88,17 @@ implementation {
 
 	async command void Alarm.stop[uint8_t tmr]() {
 		atomic {
-			if(channelTimerIsRunning(&lp_timers[tmr])) {
+			if(hal_timer_is_running(&lp_timers[tmr])) {
 				#ifdef ACM_DEBUG
 					debug1("stp[%"PRIu8"]", tmr);
 				#endif
-				channelTimerStop(tmr, &lp_timers[tmr]);
+				hal_timer_stop(&lp_timers[tmr]);
 			}
 		}
 	}
 
 	async command bool Alarm.isRunning[uint8_t tmr]() {
-		atomic return channelTimerIsRunning(&lp_timers[tmr]);
+		atomic return hal_timer_is_running(&lp_timers[tmr]);
 	}
 
 	async command void Alarm.startAt[uint8_t tmr](uint32_t t0, uint32_t dt) {
@@ -134,7 +127,7 @@ implementation {
 			alarm[tmr] = t0 + dt; // Does this make sense if this is in the past?
 
 			// rslt = osTimerStart(timers[tmr], tdt);
-            rslt = channelTimerStart(tmr, &lp_timers[tmr], tdt);
+            rslt = hal_timer_start(&lp_timers[tmr], tdt);
 			if(rslt != osOK) {
 				err1("tmr["PRIu8"] death %d", tmr, rslt);
 			}
@@ -157,7 +150,7 @@ implementation {
 	// -----
 
 	async command uint32_t Counter.get() {
-        return channelTimerGetNow();
+        return hal_timer_get_now();
 	}
 
 	async command bool Counter.isOverflowPending() {

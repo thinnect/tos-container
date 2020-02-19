@@ -290,6 +290,9 @@ implementation {
 	}
 
 	command error_t SplitControl.stop() {
+		if(m_radio == NULL) {
+			return ENOMEM;
+		}
 		if(m_state == ST_OFF) {
 			return EALREADY;
 		}
@@ -299,6 +302,7 @@ implementation {
 				m_state = ST_STOPPING;
 				return SUCCESS;
 			}
+			return FAIL;
 		}
 		return EBUSY;
 	}

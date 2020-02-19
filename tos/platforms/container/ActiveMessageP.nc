@@ -278,6 +278,15 @@ implementation {
 		if(m_state == ST_RUNNING) {
 			return EALREADY;
 		}
+
+		// !!! Keep radio on !!!
+		if (m_radio_set_up == TRUE)
+		{
+			post startDone();
+			m_state = ST_STARTING;
+			return SUCCESS;
+		}
+		
 		if(m_state == ST_OFF) {
 			comms_error_t rslt = comms_start(m_radio, radio_start_done, NULL);
 			if(rslt == COMMS_SUCCESS) {
@@ -293,14 +302,20 @@ implementation {
 		if(m_state == ST_OFF) {
 			return EALREADY;
 		}
-		if(m_state == ST_RUNNING) {
-			comms_error_t rslt = comms_stop(m_radio, radio_stop_done, NULL);
-			if(rslt == COMMS_SUCCESS) {
-				m_state = ST_STOPPING;
-				return SUCCESS;
-			}
-		}
-		return EBUSY;
+
+		// !!! Keep radio on !!!
+		post stopDone();
+		m_state = ST_STOPPING;
+		return SUCCESS;
+
+		//if(m_state == ST_RUNNING) {
+		//	comms_error_t rslt = comms_stop(m_radio, radio_stop_done, NULL);
+		//	if(rslt == COMMS_SUCCESS) {
+		//		m_state = ST_STOPPING;
+		//		return SUCCESS;
+		//	}
+		//}
+		// return EBUSY;
 	}
 	// -------------------------------------------------------------------------
 

@@ -20,7 +20,7 @@ configuration ActiveMessageC {
 
 		interface PacketField<uint8_t> as PacketLinkQuality;
 		//interface PacketField<uint8_t> as PacketTransmitPower;
-		interface PacketField<uint8_t> as PacketRSSI;
+		interface PacketField<int8_t> as PacketRSSI;
 		//interface LinkPacketMetadata;
 
 		interface LocalTime<TRadio> as LocalTimeRadio;

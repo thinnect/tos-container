@@ -22,7 +22,7 @@ module ActiveMessageP {
 
 		interface PacketField<uint8_t> as PacketLinkQuality;
 		//interface PacketField<uint8_t> as PacketTransmitPower;
-		interface PacketField<uint8_t> as PacketRSSI;
+		interface PacketField<int8_t> as PacketRSSI;
 		//interface LinkPacketMetadata;
 
 		interface LocalTime<TRadio> as LocalTimeRadio;
@@ -119,7 +119,8 @@ implementation {
 			((radio_metadata_t*)(msg->metadata))->event_time_valid = comms_event_time_valid(m_radio, cmsg);
 
 			call PacketLinkQuality.set(msg, comms_get_lqi(m_radio, cmsg));
-			call PacketRSSI.set(msg, (90+comms_get_rssi(m_radio, cmsg))/3 + 1); // RFR2 RSSI 0-28 units
+			call PacketRSSI.set(msg, comms_get_rssi(m_radio, cmsg));
+
 
 			payload = call Packet.getPayload(msg, len);
 			if(payload == NULL) {
@@ -160,13 +161,13 @@ implementation {
 			uint8_t length = call Packet.payloadLength(msg);
 
 			if(call TimeSyncPacketMilli.isValid(msg)) {
-				debug1("rcv %02"PRIX8" %04"PRIX16" r:%"PRIu8" age=%"PRIi32,
+				debug1("rcv %02"PRIX8" %04"PRIX16" r:%"PRIi8" age=%"PRIi32,
 					   call AMPacket.type(msg), call AMPacket.source(msg),
                        call PacketRSSI.get(msg),
 				       call LocalTimeMilli.get() - call TimeSyncPacketMilli.eventTime(msg));
 			}
 			else {
-				debug1("rcv %02"PRIX8" %04"PRIX16" r:%"PRIu8,
+				debug1("rcv %02"PRIX8" %04"PRIX16" r:%"PRIi8,
 					   call AMPacket.type(msg), call AMPacket.source(msg),
 					   call PacketRSSI.get(msg));
 			}
@@ -521,13 +522,13 @@ implementation {
 	async command bool PacketRSSI.isSet(message_t* msg) {
 		return ((radio_metadata_t*)(msg->metadata))->rssi_set;
 	}
-	async command uint8_t PacketRSSI.get(message_t* msg) {
+	async command int8_t PacketRSSI.get(message_t* msg) {
 		return ((radio_metadata_t*)(msg->metadata))->rssi;
 	}
 	async command void PacketRSSI.clear(message_t* msg) {
 		((radio_metadata_t*)(msg->metadata))->rssi_set = FALSE;
 	}
-	async command void PacketRSSI.set(message_t* msg, uint8_t value) {
+	async command void PacketRSSI.set(message_t* msg, int8_t value) {
 		((radio_metadata_t*)(msg->metadata))->rssi_set = TRUE;
 		((radio_metadata_t*)(msg->metadata))->rssi = value;
 	}

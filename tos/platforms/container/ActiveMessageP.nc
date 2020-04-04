@@ -66,9 +66,35 @@ implementation {
 
 	bool m_radio_set_up = FALSE;
 
+	void commsReceive(comms_layer_t* comms, const comms_msg_t* msg, void* user);
+
 	int container_am_radio_init(comms_layer_t* cl) @C() @spontaneous() {
 		m_radio = cl;
 		return 0;
+	}
+
+	void container_am_radio_connect() @C() @spontaneous() {
+		atomic {
+			if(FALSE == m_radio_set_up) {
+				uint8_t i;
+				for(i=0;i<sizeof(rcvids);i++) {
+					comms_register_recv(m_radio, &m_receivers[i], commsReceive, NULL, rcvids[i]);
+				}
+				m_radio_set_up = TRUE;
+			}
+		}
+	}
+
+	void container_am_radio_disconnect() @C() @spontaneous() {
+		atomic {
+			if(m_radio_set_up) {
+				uint8_t i;
+				for(i=0;i<sizeof(rcvids);i++) {
+					comms_deregister_recv(m_radio, &m_receivers[i]);
+				}
+				m_radio_set_up = FALSE;
+			}
+		}
 	}
 
 	error_t tosToComms(comms_msg_t* cmsg, message_t* msg) {
@@ -221,12 +247,9 @@ implementation {
 			m_state = ST_RUNNING;
 		}
 
-		if((result == SUCCESS) && (m_radio_set_up == FALSE)) {
-			uint8_t i;
-			for(i=0;i<sizeof(rcvids);i++) {
-				comms_register_recv(m_radio, &m_receivers[i], commsReceive, NULL, rcvids[i]);
-			}
-			m_radio_set_up = TRUE;
+		if(SUCCESS == result)
+		{
+			container_am_radio_connect(); // Disconnect is however manual
 		}
 
 		signal SplitControl.startDone(result);
@@ -234,10 +257,7 @@ implementation {
 
 	task void stopDone() {
 		error_t result = SUCCESS;
-		//uint8_t i;
-		//for(i=0;i<sizeof(rcvids);i++) {
-		//	comms_deregister_recv(m_radio, &m_receivers[i]);
-		//}
+
 		if(m_control_error) {
 			m_state = ST_RUNNING;
 			result = FAIL;

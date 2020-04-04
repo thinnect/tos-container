@@ -10,6 +10,17 @@
 int container_am_radio_init(comms_layer_t* cl);
 
 /**
+ * Connect container radio to real radio, done automatically if radio
+ * started by container application.
+ */
+void container_am_radio_connect();
+
+/**
+ * Disconnect container radio from real radio, not done automatically.
+ */
+void container_am_radio_disconnect();
+
+/**
  * Initialize and boot the container.
  * @param tos_node_id The TinyOS node ID - TOS_NODE_ID.
  */

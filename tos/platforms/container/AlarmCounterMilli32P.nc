@@ -11,7 +11,7 @@ implementation {
 	#define __LOG_LEVEL__ ( LOG_LEVEL_AlarmCounterMilli32P & BASE_LOG_LEVEL )
 	#include "log.h"
 
-	extern uint32_t osCounterMilliGet() @C();
+	extern uint32_t osCounterGetMilli() @C();
 	extern void notify_resume_container() @C();
 
 	enum {
@@ -135,7 +135,7 @@ implementation {
 	// -----
 
 	async command uint32_t Counter.get() {
-		return osCounterMilliGet();
+		return osCounterGetMilli();
 	}
 
 	async command bool Counter.isOverflowPending() {

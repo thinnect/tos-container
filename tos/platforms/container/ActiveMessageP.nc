@@ -22,7 +22,7 @@ module ActiveMessageP {
 
 		interface PacketField<uint8_t> as PacketLinkQuality;
 		//interface PacketField<uint8_t> as PacketTransmitPower;
-		interface PacketField<uint8_t> as PacketRSSI;
+		interface PacketField<int8_t> as PacketRSSI;
 		//interface LinkPacketMetadata;
 
 		interface LocalTime<TRadio> as LocalTimeRadio;
@@ -36,6 +36,9 @@ module ActiveMessageP {
 	}
 	uses {
 		interface LocalTime<TMilli> as LocalTimeMilli;
+
+		interface Queue<message_t*> as RxQueue;
+		interface Pool<message_t> as RxPool;
 	}
 }
 implementation {
@@ -43,6 +46,8 @@ implementation {
 	#define __MODUUL__ "am"
 	#define __LOG_LEVEL__ (LOG_LEVEL_ActiveMessageP & BASE_LOG_LEVEL)
 	#include "log.h"
+
+	extern void notify_resume_container() @C();
 
 	enum ActiveMessageStates {
 		ST_OFF,
@@ -52,15 +57,44 @@ implementation {
 	};
 
 	uint8_t m_state = ST_OFF;
+	bool m_control_error = FALSE; // norace
 
-	const uint8_t rcvids[] = {0x3D, 0xB0, 0xB1, 0xB2, 0xB7}; // TODO the list should come from build process
+	const uint8_t rcvids[] = {0xB0, 0xB1, 0xB2, 0xB3, 0xB4, 0xB5, 0xB7}; // TODO the list should come from build process
 	comms_receiver_t m_receivers[sizeof(rcvids)];
 
 	comms_layer_t* m_radio = NULL;
 
+	bool m_radio_set_up = FALSE;
+
+	void commsReceive(comms_layer_t* comms, const comms_msg_t* msg, void* user);
+
 	int container_am_radio_init(comms_layer_t* cl) @C() @spontaneous() {
 		m_radio = cl;
 		return 0;
+	}
+
+	void container_am_radio_connect() @C() @spontaneous() {
+		atomic {
+			if(FALSE == m_radio_set_up) {
+				uint8_t i;
+				for(i=0;i<sizeof(rcvids);i++) {
+					comms_register_recv(m_radio, &m_receivers[i], commsReceive, NULL, rcvids[i]);
+				}
+				m_radio_set_up = TRUE;
+			}
+		}
+	}
+
+	void container_am_radio_disconnect() @C() @spontaneous() {
+		atomic {
+			if(m_radio_set_up) {
+				uint8_t i;
+				for(i=0;i<sizeof(rcvids);i++) {
+					comms_deregister_recv(m_radio, &m_receivers[i]);
+				}
+				m_radio_set_up = FALSE;
+			}
+		}
 	}
 
 	error_t tosToComms(comms_msg_t* cmsg, message_t* msg) {
@@ -82,6 +116,9 @@ implementation {
 		}
 
 		comms_set_ack_required(m_radio, cmsg, ((radio_metadata_t*)(msg->metadata))->ack_requested);
+		comms_set_retries(m_radio, cmsg, ((radio_metadata_t*)(msg->metadata))->retries);
+		comms_set_timeout(m_radio, cmsg, ((radio_metadata_t*)(msg->metadata))->timeout);
+		comms_set_retries_used(m_radio, cmsg, 0);
 
 		payload = comms_get_payload(m_radio, cmsg, len);
 		if(payload == NULL) {
@@ -93,87 +130,165 @@ implementation {
 		return SUCCESS;
 	}
 
-	error_t commsToTos(message_t* msg, const comms_msg_t* cmsg) {
+	error_t commsToTos(message_t* msg, const comms_msg_t* cmsg, bool rx) {
 		uint8_t len = comms_get_payload_length(m_radio, cmsg);
 		void* payload;
 
-		call Packet.clear(msg);
+		if(rx) {  // Keep existing contents for TX messages
+			call Packet.clear(msg);
 
-		call AMPacket.setType(msg, comms_get_packet_type(m_radio, cmsg));
-		call AMPacket.setDestination(msg, comms_am_get_destination(m_radio, cmsg));
-		call AMPacket.setSource(msg, comms_am_get_source(m_radio, cmsg));
+			call AMPacket.setType(msg, comms_get_packet_type(m_radio, cmsg));
+			call AMPacket.setDestination(msg, comms_am_get_destination(m_radio, cmsg));
+			call AMPacket.setSource(msg, comms_am_get_source(m_radio, cmsg));
 
+			((radio_metadata_t*)(msg->metadata))->event_time = comms_get_event_time(m_radio, cmsg);
+			((radio_metadata_t*)(msg->metadata))->event_time_valid = comms_event_time_valid(m_radio, cmsg);
+
+			call PacketLinkQuality.set(msg, comms_get_lqi(m_radio, cmsg));
+			call PacketRSSI.set(msg, comms_get_rssi(m_radio, cmsg));
+
+
+			payload = call Packet.getPayload(msg, len);
+			if(payload == NULL) {
+				return ESIZE;
+			}
+			memcpy(payload, comms_get_payload(m_radio, cmsg, len), len);
+			call Packet.setPayloadLength(msg, len);
+		}
+		else {
+			((radio_metadata_t*)(msg->metadata))->ack_received = comms_ack_received(m_radio, cmsg);
+		}
+
+		// Timestamp is sending start time for TX and sync start for RX
 		((radio_metadata_t*)(msg->metadata))->timestamp = comms_get_timestamp(m_radio, cmsg);
 		((radio_metadata_t*)(msg->metadata))->timestamp_valid = comms_timestamp_valid(m_radio, cmsg);
-
-		((radio_metadata_t*)(msg->metadata))->event_time = comms_get_event_time(m_radio, cmsg);
-		((radio_metadata_t*)(msg->metadata))->event_time_valid = comms_event_time_valid(m_radio, cmsg);
-
-		((radio_metadata_t*)(msg->metadata))->ack_received = comms_ack_received(m_radio, cmsg);
-
-		call PacketLinkQuality.set(msg, comms_get_lqi(m_radio, cmsg));
-		call PacketRSSI.set(msg, (90+comms_get_rssi(m_radio, cmsg))/3 + 1); // RFR2 RSSI 0-28 units
-
-		payload = call Packet.getPayload(msg, len);
-		if(payload == NULL) {
-			return ESIZE;
-		}
-		memcpy(payload, comms_get_payload(m_radio, cmsg, len), len);
-		call Packet.setPayloadLength(msg, len);
 
 		return SUCCESS;
 	}
 
-	message_t r_msg_mem;
-	message_t* r_tosmsg = &r_msg_mem;
-	bool r_busy = FALSE;
-
 	default event message_t* Receive.receive[uint8_t id](message_t* msg, void* payload, uint8_t length) { return msg; }
 
 	task void receivedMessage() {
-		uint8_t length = call Packet.payloadLength(r_tosmsg);
-
-		if(call TimeSyncPacketMilli.isValid(r_tosmsg)) {
-			debug1("rcv %02X %04X age=%"PRIi32, call AMPacket.type(r_tosmsg), call AMPacket.source(r_tosmsg), call LocalTimeMilli.get() - call TimeSyncPacketMilli.eventTime(r_tosmsg));
+		message_t* msg = NULL;
+		atomic {
+			while(!call RxQueue.empty()) {
+				msg = call RxQueue.dequeue();
+				if(m_state != ST_RUNNING) {
+					debug1("rcv off q:%d", call RxQueue.size());
+					call RxPool.put(msg);
+					msg = NULL;
+				}
+				else {
+					break; // process the message
+				}
+			}
 		}
-		else {
-			debug1("rcv %02X %04X", call AMPacket.type(r_tosmsg), call AMPacket.source(r_tosmsg));
-		}
+		if(msg != NULL) {
+			uint8_t length = call Packet.payloadLength(msg);
 
-		r_tosmsg = signal Receive.receive[call AMPacket.type(r_tosmsg)](r_tosmsg, call Packet.getPayload(r_tosmsg, length), length);
-		r_busy = FALSE;
+			if(call TimeSyncPacketMilli.isValid(msg)) {
+				debug1("rcv %02"PRIX8" %04"PRIX16" r:%"PRIi8" age=%"PRIi32,
+					   call AMPacket.type(msg), call AMPacket.source(msg),
+                       call PacketRSSI.get(msg),
+				       call LocalTimeMilli.get() - call TimeSyncPacketMilli.eventTime(msg));
+			}
+			else {
+				debug1("rcv %02"PRIX8" %04"PRIX16" r:%"PRIi8,
+					   call AMPacket.type(msg), call AMPacket.source(msg),
+					   call PacketRSSI.get(msg));
+			}
+
+			msg = signal Receive.receive[call AMPacket.type(msg)](msg, call Packet.getPayload(msg, length), length);
+
+			atomic {
+				call RxPool.put(msg);
+				if(!call RxQueue.empty()) {
+					post receivedMessage();
+				}
+			}
+		}
 	}
 
 	void commsReceive(comms_layer_t* comms, const comms_msg_t* msg, void* user) {
-		if(m_state == ST_RUNNING) {
-			if(r_busy == FALSE) {
-				if(commsToTos(r_tosmsg, msg) == SUCCESS) {
-					r_busy = TRUE;
-					post receivedMessage();
+		atomic {
+			if(m_state == ST_RUNNING) {
+				message_t* pm = call RxPool.get();
+				if(pm != NULL) {
+					if(commsToTos(pm, msg, TRUE) == SUCCESS) {
+						error_t r = call RxQueue.enqueue(pm);
+						if(r == SUCCESS) {
+							post receivedMessage();
+							notify_resume_container();
+							return;
+						}
+						else warn1("rcv e:%d q:%d", r, call RxQueue.size());
+					}
+					else err1("rcv cpy");
+					call RxPool.put(pm);
 				}
-				else err1("rcv cpy");
+				else warn1("rcv p:%d q:%d", call RxPool.size(), call RxQueue.size());
 			}
-			else warn("rcv bsy");
+			else {
+
+				debug1("rcv off");
+				notify_resume_container();
+			}
 		}
-		else warn("rcv off");
 	}
 
 	task void startDone() {
-		uint8_t i;
-		for(i=0;i<sizeof(rcvids);i++) {
-			comms_register_recv(m_radio, &m_receivers[i], commsReceive, NULL, rcvids[i]);
+		error_t result = SUCCESS;
+
+		if(m_control_error) {
+			m_state = ST_OFF;
+			result = FAIL;
 		}
-		signal SplitControl.startDone(SUCCESS);
-		m_state = ST_RUNNING; // Will not let anything be done from the startDone event
+		else {
+			m_state = ST_RUNNING;
+		}
+
+		if(SUCCESS == result)
+		{
+			container_am_radio_connect(); // Disconnect is however manual
+		}
+
+		signal SplitControl.startDone(result);
 	}
 
 	task void stopDone() {
-		uint8_t i;
-		for(i=0;i<sizeof(rcvids);i++) {
-			comms_deregister_recv(m_radio, &m_receivers[i]);
+		error_t result = SUCCESS;
+
+		if(m_control_error) {
+			m_state = ST_RUNNING;
+			result = FAIL;
 		}
-		signal SplitControl.stopDone(SUCCESS);
-		m_state = ST_OFF;
+		else {
+			m_state = ST_OFF;
+		}
+
+		signal SplitControl.stopDone(result);
+	}
+
+	void radio_start_done(comms_layer_t* comms, comms_status_t status, void* user) {
+		debug1("startd %d", status);
+		if(COMMS_STARTED != status)
+		{
+			err1("start fail!");
+			m_control_error = TRUE;
+		}
+		post startDone();
+		notify_resume_container();
+	}
+
+	void radio_stop_done(comms_layer_t* comms, comms_status_t status, void* user) {
+		debug1("stopd %d", status);
+		if(COMMS_STOPPED != status)
+		{
+			err1("stop fail!");
+			m_control_error = TRUE;
+		}
+		post stopDone();
+		notify_resume_container();
 	}
 
 	// SplitControl interface
@@ -185,21 +300,30 @@ implementation {
 			return EALREADY;
 		}
 		if(m_state == ST_OFF) {
-			m_state = ST_STARTING;
-			post startDone();
-			return SUCCESS;
+			comms_error_t rslt = comms_start(m_radio, radio_start_done, NULL);
+			if(rslt == COMMS_SUCCESS) {
+				m_state = ST_STARTING;
+				return SUCCESS;
+			}
+			return FAIL;
 		}
 		return EBUSY;
 	}
 
 	command error_t SplitControl.stop() {
+		if(m_radio == NULL) {
+			return ENOMEM;
+		}
 		if(m_state == ST_OFF) {
 			return EALREADY;
 		}
 		if(m_state == ST_RUNNING) {
-			m_state = ST_STOPPING;
-			post stopDone();
-			return SUCCESS;
+			comms_error_t rslt = comms_stop(m_radio, radio_stop_done, NULL);
+			if(rslt == COMMS_SUCCESS) {
+				m_state = ST_STOPPING;
+				return SUCCESS;
+			}
+			return FAIL;
 		}
 		return EBUSY;
 	}
@@ -213,21 +337,24 @@ implementation {
 		if(s_tosmsg != NULL) {
 			message_t* m = s_tosmsg;
 			s_tosmsg = NULL;
-			commsToTos(m, &s_commsmsg);
+			commsToTos(m, &s_commsmsg, FALSE);
 			debug1("asnt");
 			signal AMSend.sendDone[call AMPacket.type(m)](m, s_result);
 		}
 	}
 
 	void commsSendDone(comms_layer_t* comms, comms_msg_t* msg, comms_error_t result, void* user) {
-		s_tosmsg = user;
-		if(result == COMMS_SUCCESS) {
-			s_result = SUCCESS;
+
+		atomic {
+			if(result == COMMS_SUCCESS) {
+				s_result = SUCCESS;
+			}
+			else {
+				s_result = FAIL; // TODO map failure values
+			}
+			post sendDone();
 		}
-		else {
-			s_result = FAIL; // TODO map failure values
-		}
-		post sendDone();
+		notify_resume_container();
 	}
 
 	// AMSend interface
@@ -240,8 +367,9 @@ implementation {
 
 			if(tosToComms(&s_commsmsg, msg) == SUCCESS) {
 				comms_error_t err = comms_send(m_radio, &s_commsmsg, &commsSendDone, msg);
-				debug1("send(%p)=%d\n", &s_commsmsg, err);
+				debug1("send(%p)=%d", &s_commsmsg, err);
 				if(err == COMMS_SUCCESS) {
+					s_tosmsg = msg;
 					return SUCCESS;
 				}
 				return FAIL;
@@ -375,23 +503,34 @@ implementation {
 	// LowPowerListening interface
 	command void LowPowerListening.setLocalWakeupInterval(uint16_t intervalMs) { }
 
-	command uint16_t LowPowerListening.getLocalWakeupInterval() { return 0; }
+	command uint16_t LowPowerListening.getLocalWakeupInterval() {
+		return 0;
+	}
 
 	command void LowPowerListening.setRemoteWakeupInterval(message_t *msg, uint16_t intervalMs) { }
 
-	command uint16_t LowPowerListening.getRemoteWakeupInterval(message_t *msg) { return 0; }
+	command uint16_t LowPowerListening.getRemoteWakeupInterval(message_t *msg) {
+		return 0;
+	}
 	// -------------------------------------------------------------------------
 
 	// PacketLink interface
 	command void PacketLink.setRetries(message_t *msg, uint16_t maxRetries) {
 		((radio_metadata_t*)(msg->metadata))->ack_requested = TRUE;
+		((radio_metadata_t*)(msg->metadata))->retries = (uint8_t)maxRetries;
 	}
 
-	command void PacketLink.setRetryDelay(message_t *msg, uint16_t retryDelay) { }
+	command void PacketLink.setRetryDelay(message_t *msg, uint16_t retryDelay) {
+		((radio_metadata_t*)(msg->metadata))->timeout = retryDelay;
+	}
 
-  	command uint16_t PacketLink.getRetries(message_t *msg) { return 0; }
+  	command uint16_t PacketLink.getRetries(message_t *msg) {
+  		return ((radio_metadata_t*)(msg->metadata))->retries;
+  	}
 
-	command uint16_t PacketLink.getRetryDelay(message_t *msg) { return 0; }
+	command uint16_t PacketLink.getRetryDelay(message_t *msg) {
+		return ((radio_metadata_t*)(msg->metadata))->timeout;
+	}
 
   	command bool PacketLink.wasDelivered(message_t *msg) {
   		return ((radio_metadata_t*)(msg->metadata))->ack_received;
@@ -403,13 +542,13 @@ implementation {
 	async command bool PacketRSSI.isSet(message_t* msg) {
 		return ((radio_metadata_t*)(msg->metadata))->rssi_set;
 	}
-	async command uint8_t PacketRSSI.get(message_t* msg) {
+	async command int8_t PacketRSSI.get(message_t* msg) {
 		return ((radio_metadata_t*)(msg->metadata))->rssi;
 	}
 	async command void PacketRSSI.clear(message_t* msg) {
 		((radio_metadata_t*)(msg->metadata))->rssi_set = FALSE;
 	}
-	async command void PacketRSSI.set(message_t* msg, uint8_t value) {
+	async command void PacketRSSI.set(message_t* msg, int8_t value) {
 		((radio_metadata_t*)(msg->metadata))->rssi_set = TRUE;
 		((radio_metadata_t*)(msg->metadata))->rssi = value;
 	}
@@ -477,23 +616,28 @@ implementation {
 	error_t s_tr_result;
 
 	task void timeSyncRadioSendDone() {
+
 		if(s_tr_tosmsg != NULL) {
 			message_t* m = s_tr_tosmsg;
 			s_tr_tosmsg = NULL;
-			commsToTos(m, &s_tr_commsmsg);
+			commsToTos(m, &s_tr_commsmsg, FALSE);
 			debug1("trsnt");
 			signal TimeSyncAMSendRadio.sendDone[call AMPacket.type(m)](m, s_tr_result);
 		}
 	}
 
 	void commsTimestampRadioSendDone(comms_layer_t* comms, comms_msg_t* msg, comms_error_t result, void* user) {
-		if(result == COMMS_SUCCESS) {
-			s_tr_result = SUCCESS;
+
+		atomic {
+			if(result == COMMS_SUCCESS) {
+				s_tr_result = SUCCESS;
+			}
+			else {
+				s_tr_result = FAIL; // TODO map failure values
+			}
+			post timeSyncRadioSendDone();
 		}
-		else {
-			s_tr_result = FAIL; // TODO map failure values
-		}
-		post timeSyncRadioSendDone();
+		notify_resume_container();
 	}
 
 	// TimeSyncAMSendRadio interface
@@ -508,7 +652,7 @@ implementation {
 
 			if(tosToComms(&s_tr_commsmsg, msg) == SUCCESS) {
 				comms_error_t err = comms_send(m_radio, &s_tr_commsmsg, &commsTimestampRadioSendDone, msg);
-				debug1("send(%p)=%d\n", &s_tr_commsmsg, err);
+				debug1("send(%p)=%d", &s_tr_commsmsg, err);
 				if(err == COMMS_SUCCESS) {
 					s_tr_tosmsg = msg;
 					return SUCCESS;
@@ -541,23 +685,31 @@ implementation {
 	error_t s_tm_result;
 
 	task void timeSyncMilliSendDone() {
-		if(s_tm_tosmsg != NULL) {
-			message_t* m = s_tm_tosmsg;
-			s_tm_tosmsg = NULL;
-			commsToTos(m, &s_tm_commsmsg);
-			debug1("tmsnt");
-			signal TimeSyncAMSendMilli.sendDone[call AMPacket.type(m)](m, s_tm_result);
+
+		atomic {
+			if(s_tm_tosmsg != NULL) {
+				message_t* m = s_tm_tosmsg;
+				s_tm_tosmsg = NULL;
+				commsToTos(m, &s_tm_commsmsg, FALSE);
+				debug1("tmsnt");
+				signal TimeSyncAMSendMilli.sendDone[call AMPacket.type(m)](m, s_tm_result);
+			}
 		}
+		notify_resume_container();
 	}
 
 	void commsTimestampMilliSendDone(comms_layer_t* comms, comms_msg_t* msg, comms_error_t result, void* user) {
-		if(result == COMMS_SUCCESS) {
-			s_tm_result = SUCCESS;
+
+		atomic {
+			if(result == COMMS_SUCCESS) {
+				s_tm_result = SUCCESS;
+			}
+			else {
+				s_tm_result = FAIL; // TODO map failure values
+			}
+			post timeSyncMilliSendDone();
 		}
-		else {
-			s_tm_result = FAIL; // TODO map failure values
-		}
-		post timeSyncMilliSendDone();
+		notify_resume_container();
 	}
 
 	// TimeSyncAMSendMilli interface
@@ -572,7 +724,7 @@ implementation {
 
 			if(tosToComms(&s_tm_commsmsg, msg) == SUCCESS) {
 				comms_error_t err = comms_send(m_radio, &s_tm_commsmsg, &commsTimestampMilliSendDone, msg);
-				debug1("send(%p)=%d\n", &s_tm_commsmsg, err);
+				debug1("send(%p)=%d", &s_tm_commsmsg, err);
 				if(err == COMMS_SUCCESS) {
 					s_tm_tosmsg = msg;
 					return SUCCESS;

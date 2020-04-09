@@ -20,7 +20,7 @@ configuration ActiveMessageC {
 
 		interface PacketField<uint8_t> as PacketLinkQuality;
 		//interface PacketField<uint8_t> as PacketTransmitPower;
-		interface PacketField<uint8_t> as PacketRSSI;
+		interface PacketField<int8_t> as PacketRSSI;
 		//interface LinkPacketMetadata;
 
 		interface LocalTime<TRadio> as LocalTimeRadio;
@@ -71,6 +71,12 @@ implementation {
 	TimeSyncPacketRadio = ActiveMessageP.TimeSyncPacketRadio;
 	TimeSyncAMSendMilli = ActiveMessageP.TimeSyncAMSendMilli;
 	TimeSyncPacketMilli = ActiveMessageP.TimeSyncPacketMilli;
+
+	components new QueueC(message_t*, 10) as RxQueueC;
+	ActiveMessageP.RxQueue -> RxQueueC;
+
+	components new PoolC(message_t, 10) as RxPoolC;
+	ActiveMessageP.RxPool -> RxPoolC;
 
 	components LocalTimeMilliC;
 	ActiveMessageP.LocalTimeMilli -> LocalTimeMilliC;

@@ -22,11 +22,14 @@ typedef struct radio_metadata {
 	uint8_t lqi;
 	bool lqi_set;
 
-	uint8_t rssi;
+	int8_t rssi;
 	bool rssi_set;
 
 	bool ack_requested;
 	bool ack_received;
+
+	uint16_t retries;
+	uint32_t timeout;
 } radio_metadata_t;
 
 typedef union message_metadata {

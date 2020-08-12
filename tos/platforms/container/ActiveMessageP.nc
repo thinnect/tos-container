@@ -63,13 +63,18 @@ implementation {
 	comms_receiver_t m_receivers[sizeof(rcvids)];
 
 	comms_layer_t* m_radio = NULL;
+	comms_sleep_controller_t m_sleep_ctrl;
 
 	bool m_radio_set_up = FALSE;
 
 	void commsReceive(comms_layer_t* comms, const comms_msg_t* msg, void* user);
+	void radio_start_done(comms_layer_t* comms, comms_status_t status, void* user);
 
 	int container_am_radio_init(comms_layer_t* cl) @C() @spontaneous() {
 		m_radio = cl;
+
+		comms_register_sleep_controller(cl, &m_sleep_ctrl, radio_start_done, NULL);
+
 		return 0;
 	}
 
@@ -280,17 +285,6 @@ implementation {
 		notify_resume_container();
 	}
 
-	void radio_stop_done(comms_layer_t* comms, comms_status_t status, void* user) {
-		debug1("stopd %d", status);
-		if(COMMS_STOPPED != status)
-		{
-			err1("stop fail!");
-			m_control_error = TRUE;
-		}
-		post stopDone();
-		notify_resume_container();
-	}
-
 	// SplitControl interface
 	command error_t SplitControl.start() {
 		if(m_radio == NULL) {
@@ -300,9 +294,12 @@ implementation {
 			return EALREADY;
 		}
 		if(m_state == ST_OFF) {
-			comms_error_t rslt = comms_start(m_radio, radio_start_done, NULL);
+			comms_error_t rslt = comms_sleep_block(&m_sleep_ctrl);
 			if(rslt == COMMS_SUCCESS) {
 				m_state = ST_STARTING;
+				return SUCCESS;
+			} else if(rslt == COMMS_ALREADY) {
+				post startDone();
 				return SUCCESS;
 			}
 			return FAIL;
@@ -318,9 +315,10 @@ implementation {
 			return EALREADY;
 		}
 		if(m_state == ST_RUNNING) {
-			comms_error_t rslt = comms_stop(m_radio, radio_stop_done, NULL);
-			if(rslt == COMMS_SUCCESS) {
+			comms_error_t rslt = comms_sleep_allow(&m_sleep_ctrl);
+			if((rslt == COMMS_SUCCESS)||(rslt == COMMS_ALREADY)) {
 				m_state = ST_STOPPING;
+				post stopDone();
 				return SUCCESS;
 			}
 			return FAIL;

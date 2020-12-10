@@ -79,26 +79,22 @@ implementation {
 	}
 
 	void container_am_radio_connect() @C() @spontaneous() {
-		atomic {
-			if(FALSE == m_radio_set_up) {
-				uint8_t i;
-				for(i=0;i<sizeof(rcvids);i++) {
-					comms_register_recv(m_radio, &m_receivers[i], commsReceive, NULL, rcvids[i]);
-				}
-				m_radio_set_up = TRUE;
+		if(FALSE == m_radio_set_up) {
+			uint8_t i;
+			for(i=0;i<sizeof(rcvids);i++) {
+				comms_register_recv(m_radio, &m_receivers[i], commsReceive, NULL, rcvids[i]);
 			}
+			m_radio_set_up = TRUE;
 		}
 	}
 
 	void container_am_radio_disconnect() @C() @spontaneous() {
-		atomic {
-			if(m_radio_set_up) {
-				uint8_t i;
-				for(i=0;i<sizeof(rcvids);i++) {
-					comms_deregister_recv(m_radio, &m_receivers[i]);
-				}
-				m_radio_set_up = FALSE;
+		if(m_radio_set_up) {
+			uint8_t i;
+			for(i=0;i<sizeof(rcvids);i++) {
+				comms_deregister_recv(m_radio, &m_receivers[i]);
 			}
+			m_radio_set_up = FALSE;
 		}
 	}
 

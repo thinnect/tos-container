@@ -25,6 +25,8 @@ module ActiveMessageP {
 		interface PacketField<int8_t> as PacketRSSI;
 		//interface LinkPacketMetadata;
 
+		interface STT_MessagePriority;
+
 		interface LocalTime<TRadio> as LocalTimeRadio;
 		interface PacketTimeStamp<TRadio, uint32_t> as PacketTimeStampRadio;
 		interface PacketTimeStamp<TMilli, uint32_t> as PacketTimeStampMilli;
@@ -39,6 +41,8 @@ module ActiveMessageP {
 
 		interface Queue<message_t*> as RxQueue;
 		interface Pool<message_t> as RxPool;
+
+		interface STT_MessagePriority as TOS_STT_MessagePriority;
 	}
 }
 implementation {
@@ -120,6 +124,9 @@ implementation {
 		comms_set_retries(m_radio, cmsg, ((radio_metadata_t*)(msg->metadata))->retries);
 		comms_set_timeout(m_radio, cmsg, ((radio_metadata_t*)(msg->metadata))->timeout);
 		comms_set_retries_used(m_radio, cmsg, 0);
+		
+		// debug2("GetPri:%u", ((radio_metadata_t*)(msg->metadata))->priority);
+		// comms_set_priority(m_radio, cmsg, ((radio_metadata_t*)(msg->metadata))->priority);
 
 		payload = comms_get_payload(m_radio, cmsg, len);
 		if(payload == NULL) {
@@ -148,6 +155,7 @@ implementation {
 			call PacketLinkQuality.set(msg, comms_get_lqi(m_radio, cmsg));
 			call PacketRSSI.set(msg, comms_get_rssi(m_radio, cmsg));
 
+			call TOS_STT_MessagePriority.set(msg, comms_get_priority(m_radio, cmsg));
 
 			payload = call Packet.getPayload(msg, len);
 			if(payload == NULL) {
@@ -545,6 +553,20 @@ implementation {
 	async command void PacketRSSI.set(message_t* msg, int8_t value) {
 		((radio_metadata_t*)(msg->metadata))->rssi_set = TRUE;
 		((radio_metadata_t*)(msg->metadata))->rssi = value;
+	}
+	// -------------------------------------------------------------------------
+
+  	// STT_MessagePriority interface
+	async command uint8_t STT_MessagePriority.get(message_t* msg) {
+		//return msg->stt_metadata.priority;
+		return call TOS_STT_MessagePriority.get(msg);
+	}
+	async command void STT_MessagePriority.set(message_t* msg, uint8_t value) {
+		call TOS_STT_MessagePriority.set(msg, value);
+		// msg->stt_metadata.flags.priority = TRUE;
+		// msg->stt_metadata.priority = value;
+		//((radio_metadata_t*)(msg->metadata))->priority_valid = TRUE;
+		//((radio_metadata_t*)(msg->metadata))->priority = value;
 	}
 	// -------------------------------------------------------------------------
 

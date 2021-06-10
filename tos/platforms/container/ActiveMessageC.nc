@@ -81,4 +81,6 @@ implementation {
 	components LocalTimeMilliC;
 	ActiveMessageP.LocalTimeMilli -> LocalTimeMilliC;
 
+	components STT_MessagePriorityP;
+	ActiveMessageP.TOS_STT_MessagePriority -> STT_MessagePriorityP.STT_MessagePriority;
 }

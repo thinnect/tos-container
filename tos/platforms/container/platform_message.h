@@ -30,7 +30,12 @@ typedef struct radio_metadata {
 
 	uint16_t retries;
 	uint32_t timeout;
-} radio_metadata_t;
+}
+#ifdef ALIGN_CM0
+    __attribute__((packed)) radio_metadata_t;
+#else
+    radio_metadata_t;
+#endif
 
 typedef union message_metadata {
 	radio_metadata_t radio;

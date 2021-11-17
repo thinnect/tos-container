@@ -2,9 +2,9 @@
 #ifndef WATCHDOG_H
 #define WATCHDOG_H
 
-void wdt_reset();
+void wdt_reset(void);
 void wdt_enable(uint16_t t);
-void wdt_disable();
+void wdt_disable(void);
 
 #define WDTO_15MS   0
 #define WDTO_30MS   1

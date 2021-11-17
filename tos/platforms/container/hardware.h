@@ -21,18 +21,18 @@ inline void __nesc_atomic_end(__nesc_atomic_t original) @spontaneous() @safe() {
 	osMutexRelease(atomic_mutex);
 }
 
-inline void __nesc_enable_interrupt() @safe() {
+inline void __nesc_enable_interrupt(void) @safe() {
 	// TinyOS is not allowed to actually disable interrupts
 }
 
-inline void __nesc_disable_interrupt() @safe() {
+inline void __nesc_disable_interrupt(void) @safe() {
 	// TinyOS is not allowed to actually disable interrupts
 }
 
 // TODO wdt stuff needs cleanup
-void wdt_reset() {}
+void wdt_reset(void) {}
 void wdt_enable(uint16_t t) {}
-void wdt_disable() {}
+void wdt_disable(void) {}
 
 #endif//NESC_BUILD_BINARY
 

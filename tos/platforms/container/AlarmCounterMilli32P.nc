@@ -43,7 +43,7 @@ implementation {
 
 	void timer_callback(void* argument) @C() {
 		atomic {
-			uint8_t tmr = (argument - (void*)timers)/sizeof(void*);
+			uint8_t tmr = (osTimerId_t*)argument - timers;
 			if(tmr >= ALARM_COUNT) {
 				err1("tmr %"PRIu8, tmr);
 			}

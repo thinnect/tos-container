@@ -109,11 +109,11 @@ implementation {
 		comms_am_set_source(m_radio, cmsg, call AMPacket.address());
 
 		if(((radio_metadata_t*)(msg->metadata))->timestamp_valid) {
-			comms_set_timestamp(m_radio, cmsg, ((radio_metadata_t*)(msg->metadata))->timestamp);
+			comms_set_timestamp_micro(m_radio, cmsg, ((radio_metadata_t*)(msg->metadata))->timestamp);
 		}
 
 		if(((radio_metadata_t*)(msg->metadata))->event_time_valid) {
-			comms_set_event_time(m_radio, cmsg, ((radio_metadata_t*)(msg->metadata))->event_time);
+			comms_set_event_time_micro(m_radio, cmsg, ((radio_metadata_t*)(msg->metadata))->event_time);
 		}
 
 		comms_set_ack_required(m_radio, cmsg, ((radio_metadata_t*)(msg->metadata))->ack_requested);
@@ -142,7 +142,7 @@ implementation {
 			call AMPacket.setDestination(msg, comms_am_get_destination(m_radio, cmsg));
 			call AMPacket.setSource(msg, comms_am_get_source(m_radio, cmsg));
 
-			((radio_metadata_t*)(msg->metadata))->event_time = comms_get_event_time(m_radio, cmsg);
+			((radio_metadata_t*)(msg->metadata))->event_time = comms_get_event_time_micro(m_radio, cmsg);
 			((radio_metadata_t*)(msg->metadata))->event_time_valid = comms_event_time_valid(m_radio, cmsg);
 
 			call PacketLinkQuality.set(msg, comms_get_lqi(m_radio, cmsg));
@@ -161,7 +161,7 @@ implementation {
 		}
 
 		// Timestamp is sending start time for TX and sync start for RX
-		((radio_metadata_t*)(msg->metadata))->timestamp = comms_get_timestamp(m_radio, cmsg);
+		((radio_metadata_t*)(msg->metadata))->timestamp = comms_get_timestamp_micro(m_radio, cmsg);
 		((radio_metadata_t*)(msg->metadata))->timestamp_valid = comms_timestamp_valid(m_radio, cmsg);
 
 		return SUCCESS;
@@ -566,7 +566,7 @@ implementation {
 
 	// LocalTimeRadio interface
 	async command uint32_t LocalTimeRadio.get() {
-		return call LocalTimeMilli.get();
+		return comms_get_time_micro(m_radio);
 	}
 	// -------------------------------------------------------------------------
 
@@ -590,18 +590,22 @@ implementation {
 
 	// PacketTimeStampMilli interface
 	async command bool PacketTimeStampMilli.isValid(message_t* msg) {
-		return ((radio_metadata_t*)(msg->metadata))->timestamp_valid;
+		return call PacketTimeStampRadio.isValid(msg);
 	}
 	async command uint32_t PacketTimeStampMilli.timestamp(message_t* msg) {
-		return ((radio_metadata_t*)(msg->metadata))->timestamp;
+		uint32_t rts = call PacketTimeStampRadio.timestamp(msg);
+		uint32_t milli = call LocalTimeMilli.get();
+		uint32_t micro = call LocalTimeRadio.get();
+		return milli - (micro - rts)/1000;
 	}
 	async command void PacketTimeStampMilli.clear(message_t* msg) {
-		((radio_metadata_t*)(msg->metadata))->timestamp_valid = FALSE;
+		call PacketTimeStampRadio.clear(msg);
 	}
 	async command void PacketTimeStampMilli.set(message_t* msg, uint32_t value) {
+		uint32_t milli = call LocalTimeMilli.get();
+		uint32_t micro = call LocalTimeRadio.get();
 		debug1("PTSM.set %p %"PRIu32, msg, value);
-		((radio_metadata_t*)(msg->metadata))->timestamp_valid = TRUE;
-		((radio_metadata_t*)(msg->metadata))->timestamp = value;
+		call PacketTimeStampRadio.set(msg, micro - (milli - value)*1000);
 	}
 	// -------------------------------------------------------------------------
 
@@ -710,10 +714,14 @@ implementation {
 	command error_t TimeSyncAMSendMilli.send[am_id_t id](am_addr_t addr, message_t* msg, uint8_t len, uint32_t event_time) {
 		debug1("tmsnd[%02X] ->%04X, %d @%"PRIu32" %p", id, addr, len, event_time, msg);
 		if(s_tm_tosmsg == NULL) {
+			uint32_t micro = call LocalTimeRadio.get();
+			uint32_t milli = call LocalTimeMilli.get();
+			uint32_t evt = micro - (milli - event_time)*1000; // Event is always in the past
+
 			call Packet.setPayloadLength(msg, len);
 			call AMPacket.setType(msg, id);
 			call AMPacket.setDestination(msg, addr);
-			((radio_metadata_t*)(msg->metadata))->event_time = event_time;
+			((radio_metadata_t*)(msg->metadata))->event_time = evt;
 			((radio_metadata_t*)(msg->metadata))->event_time_valid = TRUE;
 
 			if(tosToComms(&s_tm_commsmsg, msg) == SUCCESS) {
@@ -762,7 +770,10 @@ implementation {
 	}
 
 	command uint32_t TimeSyncPacketMilli.eventTime(message_t* msg) {
-		return ((radio_metadata_t*)(msg->metadata))->event_time;
+		uint32_t milli = call LocalTimeMilli.get();
+		uint32_t micro = call LocalTimeRadio.get();
+		uint32_t evt = ((radio_metadata_t*)(msg->metadata))->event_time;
+		return milli - (micro - evt)/1000; // Event time is always in the past
 	}
 	// -------------------------------------------------------------------------
 

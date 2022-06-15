@@ -59,7 +59,7 @@ implementation {
 	uint8_t m_state = ST_OFF;
 	bool m_control_error = FALSE; // norace
 
-	const uint8_t rcvids[] = {0xB0, 0xB1, 0xB2, 0xB3, 0xB4, 0xB5, 0xB7}; // TODO the list should come from build process
+	const uint8_t rcvids[] = {0xB0, 0xB1, 0xB2, 0xB3, 0xB4, 0xB5, 0xB7, 0xB8}; // TODO the list should come from build process
 	comms_receiver_t m_receivers[sizeof(rcvids)];
 
 	comms_layer_t* m_radio = NULL;
@@ -167,7 +167,11 @@ implementation {
 		return SUCCESS;
 	}
 
-	default event message_t* Receive.receive[uint8_t id](message_t* msg, void* payload, uint8_t length) { return msg; }
+	default event message_t* Receive.receive[uint8_t id](message_t* msg, void* payload, uint8_t length)
+	{
+		err1("NoRcvr:AMID[%X]", id); 
+		return msg; 
+	}
 
 	task void receivedMessage() {
 		message_t* msg = NULL;
